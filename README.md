@@ -1,78 +1,141 @@
-# Claude to Open WebUI Connector
+# MSK Claude CLI Connector
 
-This project connects Claude API to the Open WebUI instance at `https://chat.aicopilot.aws.mskcc.org`.
+Connect the Claude CLI to MSK's Open WebUI instance at `https://chat.aicopilot.aws.mskcc.org` using a LiteLLM proxy.
+
+## Overview
+
+This project provides a LiteLLM proxy that translates between the Claude CLI and MSK's Open WebUI, allowing you to use Claude Code CLI with MSK's internal AI infrastructure.
 
 ## Setup
 
-1. **Install dependencies:**
-   ```bash
-   pip install requests anthropic
-   ```
+### 1. Install Dependencies
 
-2. **Get your session token:**
-   - Log in to https://chat.aicopilot.aws.mskcc.org in your browser
-   - Open Developer Tools (F12)
-   - Go to Application/Storage → Cookies
-   - Copy the value of the `token` cookie
-   
-3. **Set session token:**
-   ```bash
-   export WEBUI_SESSION_TOKEN="your-token-here"
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-4. **Run the connector:**
-   ```bash
-   python claude_webui_connector.py
-   ```
+### 2. Get Your Session Token
+
+1. Log in to https://chat.aicopilot.aws.mskcc.org in your browser
+2. Open Developer Tools (F12)
+3. Go to Application/Storage → Cookies
+4. Copy the value of the `token` cookie
+
+### 3. Create Authentication File
+
+Create a `.auth.env` file in this directory:
+
+```bash
+export WEBUI_SESSION_TOKEN='your-token-here'
+```
+
+**Note:** Add `.auth.env` to `.gitignore` to avoid committing your token.
 
 ## Usage
 
-### Basic Example
+### Start the LiteLLM Proxy
 
-```python
-from claude_webui_connector import WebUIConnector
+The proxy runs on port 22660 by default and automatically loads your session token:
 
-# Initialize connector with session token
-connector = WebUIConnector(
-    base_url="https://chat.aicopilot.aws.mskcc.org",
-    session_token="your-token-here"
-)
-
-# Get available models
-models = connector.get_models()
-print(models)
-
-# Send a chat message
-messages = [
-    {"role": "user", "content": "Hello!"}
-]
-response = connector.chat_completion(messages, model="claude")
-print(response)
-
-# Stream responses
-for chunk in connector.stream_chat_completion(messages, model="claude"):
-    if 'choices' in chunk and len(chunk['choices']) > 0:
-        delta = chunk['choices'][0].get('delta', {})
-        if 'content' in delta:
-            print(delta['content'], end='', flush=True)
+```bash
+./start_litellm_proxy.sh
 ```
 
-## API Endpoints
+The proxy will:
+- Listen on `http://localhost:22660`
+- Connect to MSK WebUI at `https://chat.aicopilot.aws.mskcc.org`
+- Handle SSL verification for the internal MSK server
+- Support all available Claude models
 
-The connector uses the following Open WebUI endpoints:
+### Use Claude CLI
 
-- **Get Models:** `GET /api/models`
-- **Chat Completions:** `POST /api/chat/completions`
-- **Streaming Chat:** `POST /api/chat/completions` (with `stream=true`)
+In a separate terminal, use the provided wrapper script:
+
+```bash
+# Use default model (claude-sonnet-4.5) in current directory
+./connect_claude.sh
+
+# Use a specific model
+./connect_claude.sh -m claude-sonnet-4
+
+# Work in a specific directory
+./connect_claude.sh /path/to/project
+
+# Use specific model in specific directory
+./connect_claude.sh -m claude-3.7-sonnet /path/to/project
+```
+
+Available models:
+- `claude-sonnet-4.5` (default) - 65,536 max tokens
+- `claude-sonnet-4` - 65,536 max tokens
+- `claude-3.7-sonnet` - 65,536 max tokens
+- `claude-3.5-sonnet` - 8,192 max tokens
+
+**Note:** Haiku model requests automatically fallback to Claude Sonnet 4.5 since Haiku models are not available on the MSK WebUI.
 
 ## Configuration
 
-- `base_url`: The base URL of your Open WebUI instance
-- `session_token`: Your session token from browser cookies (can be set via `WEBUI_SESSION_TOKEN` environment variable)
+### LiteLLM Configuration (`litellm_config.yaml`)
 
-## Notes
+The proxy is configured with:
+- Model mappings to MSK WebUI Bedrock models
+- Per-model token limits
+- SSL verification disabled for internal MSK server
+- Environment variable substitution for session token
 
-- The Open WebUI instance uses OpenAI-compatible API endpoints
-- Authentication is done via session cookies (no API keys)
-- Session tokens may expire - you'll need to refresh them by logging in again
-- Model names may vary - use `get_models()` to see available models
+### Environment Setup (`setup_claude_env.sh`)
+
+Configures Claude CLI to use the LiteLLM proxy:
+- Sets `ANTHROPIC_AUTH_TOKEN` for authentication
+- Configures base URL to `http://localhost:22660`
+- Disables telemetry and error reporting
+
+## Architecture
+
+```
+Claude CLI → LiteLLM Proxy (localhost:22660) → MSK Open WebUI (HTTPS) → Bedrock Claude Models
+```
+
+The LiteLLM proxy:
+1. Receives requests from Claude CLI in Anthropic API format
+2. Translates them to OpenAI-compatible format
+3. Forwards to MSK WebUI with your session token
+4. Handles SSL verification bypass for internal MSK certificates
+5. Returns responses in the format Claude CLI expects
+
+## Troubleshooting
+
+### Session Token Expired
+
+If you get 401 errors, your session token may have expired. Get a new token from the browser and update `.auth.env`.
+
+### SSL Certificate Errors
+
+The proxy automatically handles SSL verification for the internal MSK server. If you still see SSL errors, make sure you're running the latest version of the proxy.
+
+### Model Not Available
+
+Some Claude models (like Haiku) are not available on MSK WebUI. The proxy automatically falls back to Claude Sonnet 4.5 for these requests.
+
+### Port Already in Use
+
+If port 22660 is already in use, you can change it in:
+1. `start_litellm_proxy.sh` (the `--port` parameter)
+2. `setup_claude_env.sh` (the `ANTHROPIC_BASE_URL`)
+
+## Files
+
+- `start_litellm_proxy.sh` - Starts the LiteLLM proxy server
+- `start_litellm.py` - Python wrapper that patches SSL verification
+- `litellm_config.yaml` - LiteLLM proxy configuration
+- `connect_claude.sh` - Wrapper to launch Claude CLI with proxy
+- `setup_claude_env.sh` - Environment configuration for Claude CLI
+- `.auth.env` - Your session token (create this, not in git)
+- `requirements.txt` - Python dependencies
+
+## Security Notes
+
+- Never commit `.auth.env` to git
+- Session tokens expire periodically and need to be refreshed
+- The proxy runs locally and only you can access it
+- SSL verification is disabled only for the MSK internal server connection
