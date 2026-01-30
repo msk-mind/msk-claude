@@ -4,54 +4,54 @@ model_list:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      max_tokens: 65536
     model_info:
       verify_ssl: false
+      max_output_tokens: 65536
   
   - model_name: claude-sonnet-4
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      max_tokens: 65536
     model_info:
       verify_ssl: false
+      max_output_tokens: 65536
   
   - model_name: claude-3.7-sonnet
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      max_tokens: 65536
     model_info:
       verify_ssl: false
+      max_output_tokens: 65536
   
   - model_name: claude-3.5-sonnet
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      max_tokens: 8192
     model_info:
       verify_ssl: false
+      max_output_tokens: 8192
   
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      max_tokens: 65536
     model_info:
       verify_ssl: false
+      max_output_tokens: 65536
   
   - model_name: claude-3.5-haiku
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      max_tokens: 65536
     model_info:
       verify_ssl: false
+      max_output_tokens: 65536
 
 litellm_settings:
   drop_params: true
