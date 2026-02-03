@@ -2,6 +2,7 @@
 import ssl
 import os
 import sys
+import socket
 
 # Disable SSL verification globally
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -21,14 +22,46 @@ def patched_init(self, *args, **kwargs):
 
 TCPConnector.__init__ = patched_init
 
+def find_available_port(start_port=22660, max_attempts=100):
+    """Find the next available port starting from start_port."""
+    for port in range(start_port, start_port + max_attempts):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('127.0.0.1', port))
+                return port
+        except OSError:
+            continue
+    raise RuntimeError(f"Could not find an available port in range {start_port}-{start_port + max_attempts}")
+
 # Run litellm
 from litellm.proxy.proxy_cli import run_server
 
 if __name__ == "__main__":
+    port = find_available_port()
+    hostname = socket.gethostname()
+
+    # Write port to file for connect_claude.sh to read
+    port_file = os.path.join(os.path.dirname(__file__), '.litellm_port')
+    with open(port_file, 'w') as f:
+        f.write(str(port))
+
+    # Write server info to file for remote connections
+    info_file = os.path.join(os.path.dirname(__file__), '.litellm_server_info')
+    with open(info_file, 'w') as f:
+        f.write(f"hostname={hostname}\n")
+        f.write(f"port={port}\n")
+        f.write(f"url=http://{hostname}:{port}\n")
+
+    print(f"Server hostname: {hostname}")
+    print(f"Using port: {port}")
+    print(f"Server URL: http://{hostname}:{port}")
+    print(f"Port written to: {port_file}")
+    print(f"Server info written to: {info_file}")
+
     sys.argv = [
         "litellm",
         "--config", "litellm_config.yaml",
-        "--port", "22660",
-        "--host", "127.0.0.1"
+        "--port", str(port),
+        "--host", "0.0.0.0"
     ]
     run_server()

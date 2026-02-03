@@ -36,7 +36,7 @@ export PYTHONHTTPSVERIFY=0
 export CURL_CA_BUNDLE=""
 
 echo "Starting LiteLLM proxy..."
-echo "Proxy will listen on: http://localhost:22660"
+echo "Finding next available port (starting from 22660)..."
 echo "WebUI backend: https://chat.aicopilot.aws.mskcc.org"
 echo ""
 echo "Press Ctrl+C to stop"

@@ -1,31 +1,38 @@
 model_list:
+  # Claude Sonnet 4.5 (Latest)
   - model_name: claude-sonnet-4.5
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
+      fallbacks: ["claude-3.7-sonnet", "claude-sonnet-4", "gpt-4.1"]
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
-  
+
+  # Claude Sonnet 4
   - model_name: claude-sonnet-4
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
+      fallbacks: ["claude-3.7-sonnet", "gpt-4.1"]
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
-  
+
+  # Claude 3.7 Sonnet
   - model_name: claude-3.7-sonnet
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
+      fallbacks: ["gpt-4.1"]
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
-  
+
+  # Claude 3.5 Sonnet
   - model_name: claude-3.5-sonnet
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
@@ -34,29 +41,112 @@ model_list:
     model_info:
       verify_ssl: false
       max_output_tokens: 8192
-  
+
+  # Claude Haiku 4.5 (mapped to 3.7 Sonnet since Haiku not available)
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
-      model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
+      model: openai/bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
+      drop_params: true
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
-  
-  - model_name: claude-3.5-haiku
+
+  # Additional models available at the endpoint
+  - model_name: amazon-nova-pro
     litellm_params:
-      model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
+      model: openai/bedrock-nova-pro
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
-      max_output_tokens: 65536
+      max_output_tokens: 32768
+
+  - model_name: llama-3.3-70b
+    litellm_params:
+      model: openai/bedrock-llama3-3-70b
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 8192
+
+  - model_name: llama-3.2-90b
+    litellm_params:
+      model: openai/bedrock/us.meta.llama3-2-90b-instruct-v1:0
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 8192
+
+  # Azure OpenAI GPT models
+  - model_name: gpt-5.2
+    litellm_params:
+      model: openai/azure/gpt-5.2
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 16384
+
+  - model_name: gpt-5
+    litellm_params:
+      model: openai/azure/gpt-5
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 16384
+
+  - model_name: o3
+    litellm_params:
+      model: openai/azure/o3
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 100000
+
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/azure/chat-gpt-4o
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 16384
+
+  - model_name: gpt-4.1
+    litellm_params:
+      model: openai/azure/gpt-4.1
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 128000
+
+  - model_name: o1
+    litellm_params:
+      model: openai/azure/o1
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      max_output_tokens: 100000
 
 litellm_settings:
   drop_params: true
   telemetry: false
   ssl_verify: false
+  allowed_fails: 3
+  # Drop parameters that Bedrock doesn't support
+  drop_params_for_model:
+    bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0: ["output_config"]
+    bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0: ["output_config"]
+    bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0: ["output_config"]
+    bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0: ["output_config"]
 
 general_settings:
   master_key: sk-1234
