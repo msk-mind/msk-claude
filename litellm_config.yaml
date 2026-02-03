@@ -5,7 +5,8 @@ model_list:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      fallbacks: ["claude-3.7-sonnet", "claude-sonnet-4", "gpt-4.1"]
+      drop_params: true
+      max_tokens: 16384
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
@@ -16,7 +17,8 @@ model_list:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      fallbacks: ["claude-3.7-sonnet", "gpt-4.1"]
+      drop_params: true
+      max_tokens: 16384
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
@@ -27,7 +29,8 @@ model_list:
       model: openai/bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
-      fallbacks: ["gpt-4.1"]
+      drop_params: true
+      max_tokens: 16384
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
@@ -38,6 +41,8 @@ model_list:
       model: openai/bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
+      drop_params: true
+      max_tokens: 8192
     model_info:
       verify_ssl: false
       max_output_tokens: 8192
@@ -49,6 +54,7 @@ model_list:
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
       drop_params: true
+      max_tokens: 16384
     model_info:
       verify_ssl: false
       max_output_tokens: 65536
@@ -141,12 +147,24 @@ litellm_settings:
   telemetry: false
   ssl_verify: false
   allowed_fails: 3
-  # Drop parameters that Bedrock doesn't support
-  drop_params_for_model:
-    bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0: ["output_config"]
-    bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0: ["output_config"]
-    bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0: ["output_config"]
-    bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0: ["output_config"]
+  request_timeout: 600
+
+router_settings:
+  # Regular fallbacks (for model unavailable, rate limits, etc.)
+  # Note: claude-3.5-sonnet excluded due to 8192 token limit incompatibility
+  fallbacks:
+    - claude-sonnet-4.5: ["claude-sonnet-4", "claude-3.7-sonnet"]
+    - claude-sonnet-4: ["claude-3.7-sonnet"]
+    - claude-haiku-4-5-20251001: ["claude-3.7-sonnet"]
+    - gpt-4.1: ["gpt-4o", "gpt-5"]
+    - gpt-4o: ["gpt-4.1", "gpt-5"]
+  # Content policy fallbacks (for content filtering errors)
+  content_policy_fallbacks:
+    - claude-sonnet-4.5: ["claude-sonnet-4", "claude-3.7-sonnet"]
+    - claude-sonnet-4: ["claude-3.7-sonnet"]
+    - claude-haiku-4-5-20251001: ["claude-3.7-sonnet"]
+    - gpt-4.1: ["gpt-4o"]
+    - gpt-4o: ["gpt-4.1"]
 
 general_settings:
   master_key: sk-1234

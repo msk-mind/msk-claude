@@ -4,6 +4,11 @@ import os
 import sys
 import socket
 
+# Add script directory to Python path for custom callbacks
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
 # Disable SSL verification globally
 ssl._create_default_https_context = ssl._create_unverified_context
 os.environ['PYTHONHTTPSVERIFY'] = '0'
@@ -35,6 +40,12 @@ def find_available_port(start_port=22660, max_attempts=100):
 
 # Run litellm
 from litellm.proxy.proxy_cli import run_server
+import litellm
+
+# Register custom callback to strip unsupported params
+from custom_callbacks import strip_params_callback
+litellm.callbacks = [strip_params_callback]
+print("Registered custom callback: StripUnsupportedParams")
 
 if __name__ == "__main__":
     port = find_available_port()
