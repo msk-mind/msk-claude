@@ -1,5 +1,7 @@
 # MSK Claude CLI Connector
 
+⚠️ **This approach is very expensive so we don't recommend it (think $500 for two days of coding)**
+
 Connect the Claude CLI to MSK's Open WebUI instance at `https://chat.aicopilot.aws.mskcc.org` using a LiteLLM proxy.
 
 ## Overview
