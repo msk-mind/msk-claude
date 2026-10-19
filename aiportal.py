@@ -22,6 +22,7 @@ import re
 import secrets
 import stat
 import sys
+import tempfile
 import time
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -107,11 +108,12 @@ def group_of(name):
 # --- token ------------------------------------------------------------------
 
 def load_token():
-    token = os.environ.get("WEBUI_SESSION_TOKEN")
-    if not token and os.path.exists(AUTH_PATH):
+    """The token in .auth.env wins over the environment, so refreshing the file always takes effect."""
+    if os.path.exists(AUTH_PATH):
         m = re.search(r"WEBUI_SESSION_TOKEN=['\"]?([^'\"\n]+)", open(AUTH_PATH).read())
-        token = m and m.group(1)
-    return token
+        if m:
+            return m.group(1)
+    return os.environ.get("WEBUI_SESSION_TOKEN")
 
 
 def token_expiry(token):
@@ -132,14 +134,43 @@ def restrict_to_owner(path):
     return False
 
 
+def _new_key_file():
+    """Write a fresh key to a private temp file next to the key file and return its path."""
+    fd, tmp = tempfile.mkstemp(prefix=".litellm_master_key.", suffix=".tmp", dir=SCRIPT_DIR)
+    with os.fdopen(fd, "w") as f:
+        f.write(f"sk-{secrets.token_urlsafe(32)}\n")
+    return tmp
+
+
+def _read_key():
+    try:
+        return open(PROXY_KEY_PATH).read().strip()
+    except FileNotFoundError:
+        return ""
+
+
 def ensure_proxy_key():
-    """The secret clients use to authenticate to the proxy, created on first use."""
+    """The secret clients use to authenticate to the proxy, created on first use.
+
+    The key file only ever appears fully written: it is created by hard-linking a
+    complete temp file into place, which also fails safely if another process
+    created it first. An empty or truncated key is replaced, never returned.
+    """
     if not os.path.exists(PROXY_KEY_PATH):
-        fd = os.open(PROXY_KEY_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.write(f"sk-{secrets.token_urlsafe(32)}\n")
+        tmp = _new_key_file()
+        try:
+            os.link(tmp, PROXY_KEY_PATH)
+        except FileExistsError:
+            pass
+        finally:
+            os.unlink(tmp)
+    key = _read_key()
+    if len(key) < 20:
+        tmp = _new_key_file()
+        os.replace(tmp, PROXY_KEY_PATH)
+        key = _read_key()
     restrict_to_owner(PROXY_KEY_PATH)
-    return open(PROXY_KEY_PATH).read().strip()
+    return key
 
 
 def cmd_token_check():

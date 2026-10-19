@@ -72,13 +72,13 @@ aiportal-claude -m claude-opus-5.5 /path/to/project
 You don't need to start the proxy yourself. On launch, `aiportal-opencode` and `aiportal-claude`:
 
 1. Check that your session token hasn't expired
-2. Look for the proxy recorded in `.litellm_server_info`, and reuse it if it is reachable
+2. Look for this machine's proxy (recorded in `.proxy/<hostname>/`), and reuse it if it is reachable
 3. Otherwise start a new proxy in the background on the current machine and wait until it is ready
 4. Restart a background proxy on this machine if `.auth.env`, `litellm_config.yaml` or `custom_callbacks.py` changed since it started (the proxy only reads them at startup)
 
-The proxy keeps running after you exit, so later sessions start straight away. Its log is in `.litellm_proxy.log`.
+The proxy keeps running after you exit, so later sessions start straight away. Its log is in `.proxy/<hostname>/proxy.log`. Each machine keeps its own state there, so machines sharing your home directory don't interfere with each other.
 
-The proxy only accepts connections from the machine it runs on, and every request must carry the secret key in `.litellm_master_key` (generated on first use, readable only by you; `aiportal-opencode` and `aiportal-claude` pass it automatically). To use one proxy from several machines, start it with `MSK_PROXY_BIND=0.0.0.0 aiportal-opencode` on the host; clients on other machines find it through `.litellm_server_info` and use the same key, since your home directory is shared.
+The proxy only accepts connections from the machine it runs on, and every request must carry the secret key in `.litellm_master_key` (generated on first use, readable only by you; `aiportal-opencode` and `aiportal-claude` pass it automatically). To use one proxy from several machines, start it with `MSK_PROXY_BIND=0.0.0.0 aiportal-opencode` on the host; launches on other machines that have no proxy of their own find and use it, with the same key, since your home directory is shared.
 
 ```bash
 ./stop_litellm_proxy.sh     # stop the background proxy (on the machine that started it)
@@ -150,7 +150,7 @@ These come with the fix in the message: refresh `.auth.env` for a rejected token
 
 ### Proxy won't start
 
-The launch command prints the end of `.litellm_proxy.log`. Run `./start_litellm_proxy.sh` to see the full output in the foreground.
+The launch command prints the end of `.proxy/<hostname>/proxy.log`. Run `./start_litellm_proxy.sh` to see the full output in the foreground.
 
 ### SSL Certificate Errors
 
@@ -170,7 +170,7 @@ The proxy disables SSL verification for the internal MSK server. If you still se
 - `custom_callbacks.py` - Request fixes and error hints applied by the proxy
 - `litellm_config.yaml` - Proxy configuration and model list
 - `requirements.txt` - Python dependencies
-- Generated, not in git: `.auth.env`, `.litellm_master_key`, `.litellm_server_info`, `.litellm_port`, `.litellm_proxy.log`, `.litellm_proxy.pid`, `.litellm_proxy.lock`, `.opencode_msk.json`
+- Generated, not in git: `.auth.env`, `.litellm_master_key`, `.opencode_msk.json`, `.proxy/` (per-machine proxy state and log)
 
 ## Known Issues
 

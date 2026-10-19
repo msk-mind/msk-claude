@@ -43,6 +43,11 @@ show_usage() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         -m|--model)
+            if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                echo "Error: $1 needs a model name"
+                show_usage
+                exit 1
+            fi
             MODEL="$2"
             shift 2
             ;;
