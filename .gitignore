@@ -1,2 +1,9 @@
 *.env
 .litellm_port
+.litellm_server_info
+.litellm_proxy.log
+.litellm_proxy.pid
+__pycache__/
+.opencode_msk.json
+.litellm_proxy.lock
+.litellm_master_key

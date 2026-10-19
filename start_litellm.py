@@ -27,12 +27,15 @@ def patched_init(self, *args, **kwargs):
 
 TCPConnector.__init__ = patched_init
 
+# Listen on localhost only unless MSK_PROXY_BIND=0.0.0.0 opts in to remote clients
+BIND_HOST = os.environ.get("MSK_PROXY_BIND", "127.0.0.1")
+
 def find_available_port(start_port=22660, max_attempts=100):
     """Find the next available port starting from start_port."""
     for port in range(start_port, start_port + max_attempts):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('127.0.0.1', port))
+                s.bind((BIND_HOST, port))
                 return port
         except OSError:
             continue
@@ -48,6 +51,10 @@ litellm.callbacks = [strip_params_callback]
 print("Registered custom callback: StripUnsupportedParams")
 
 if __name__ == "__main__":
+    # Clients must present this secret (read from .litellm_master_key)
+    import aiportal
+    os.environ["LITELLM_MASTER_KEY"] = aiportal.ensure_proxy_key()
+
     port = find_available_port()
     hostname = socket.gethostname()
 
@@ -61,11 +68,12 @@ if __name__ == "__main__":
     with open(info_file, 'w') as f:
         f.write(f"hostname={hostname}\n")
         f.write(f"port={port}\n")
+        f.write(f"bind={BIND_HOST}\n")
         f.write(f"url=http://{hostname}:{port}\n")
 
     print(f"Server hostname: {hostname}")
     print(f"Using port: {port}")
-    print(f"Server URL: http://{hostname}:{port}")
+    print(f"Server URL: http://{hostname}:{port} (listening on {BIND_HOST})")
     print(f"Port written to: {port_file}")
     print(f"Server info written to: {info_file}")
 
@@ -73,6 +81,6 @@ if __name__ == "__main__":
         "litellm",
         "--config", "litellm_config.yaml",
         "--port", str(port),
-        "--host", "0.0.0.0"
+        "--host", BIND_HOST
     ]
     run_server()
