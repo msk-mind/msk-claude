@@ -1,6 +1,6 @@
 #!/bin/bash
-# Configure environment for Claude CLI to connect to LiteLLM proxy
-# Source this file or use connect_claude.sh wrapper
+# Configure the environment for Claude Code to use the LiteLLM proxy.
+# Sourced by bin/aiportal-claude; you can also source it yourself and run `claude`.
 
 # Get the script's directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

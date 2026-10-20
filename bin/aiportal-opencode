@@ -2,12 +2,13 @@
 # Wrapper script to connect opencode to Open WebUI via LiteLLM proxy
 
 # Get script directory before any directory changes (resolving the aiportal-opencode symlink)
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+AIPORTAL="$REPO_DIR/bin/aiportal"
 
 # Default model
 DEFAULT_MODEL="claude-sonnet-5.5"
 # Model names come from litellm_config.yaml
-mapfile -t AVAILABLE_MODELS < <(python3 "$SCRIPT_DIR/aiportal.py" names)
+mapfile -t AVAILABLE_MODELS < <("$AIPORTAL" models)
 
 MODEL="$DEFAULT_MODEL"
 WORK_DIR="."
@@ -36,7 +37,7 @@ show_usage() {
     echo "  $cmd -m gpt-5.5               # Use specific model in current directory"
     echo "  $cmd -m claude-opus-5.5 /path # Use specific model in specified directory"
     echo ""
-    echo "Update the model list from the MSK endpoint with: $SCRIPT_DIR/aiportal.py sync --apply"
+    echo "Update the model list from the MSK endpoint with: aiportal models sync --apply"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -82,7 +83,7 @@ fi
 WORK_DIR="$(cd "$WORK_DIR" && pwd)"
 
 # Find a running proxy, or start one
-source "$SCRIPT_DIR/ensure_proxy.sh" || exit 1
+source "$REPO_DIR/lib/ensure_proxy.sh" || exit 1
 
 LITELLM_BASE_URL="http://${LITELLM_HOST}:${LITELLM_PORT}/v1"
 
@@ -93,14 +94,14 @@ echo ""
 
 # Generate an MSK-only config and layer it over the user's global opencode config
 # via OPENCODE_CONFIG, so the global ~/.config/opencode/opencode.json is never modified
-export OPENCODE_CONFIG="$SCRIPT_DIR/.opencode_msk.json"
+export OPENCODE_CONFIG="$REPO_DIR/.proxy/$(hostname)/opencode.json"
 
-MSK_MODELS_JSON="$(python3 "$SCRIPT_DIR/aiportal.py" opencode-models)" || {
+MSK_MODELS_JSON="$("$AIPORTAL" _opencode-models)" || {
     echo "Error: Failed to read models from litellm_config.yaml"
     exit 1
 }
 
-python3 - "$OPENCODE_CONFIG" "$LITELLM_BASE_URL" "$MODEL" "$MSK_MODELS_JSON" <<'PYEOF' || { echo "Error: Failed to write opencode config"; exit 1; }
+(umask 077; python3 - "$OPENCODE_CONFIG" "$LITELLM_BASE_URL" "$MODEL" "$MSK_MODELS_JSON") <<'PYEOF' || { echo "Error: Failed to write opencode config"; exit 1; }
 import json, sys
 
 config_path, base_url, model, models_json = sys.argv[1:5]
