@@ -1,5 +1,11 @@
+# Session token
 *.env
-__pycache__/
-.opencode_msk.json
-.litellm_master_key
+
+# Runtime state: proxy key, per-machine proxy state, logs and opencode config
 .proxy/
+
+__pycache__/
+
+# Files from earlier versions (moved into .proxy/ on the next launch)
+.litellm_master_key
+.opencode_msk.json

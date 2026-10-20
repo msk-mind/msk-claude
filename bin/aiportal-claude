@@ -2,12 +2,13 @@
 # Wrapper script to connect Claude CLI to Open WebUI
 
 # Get script directory before any directory changes (resolving the aiportal-claude symlink)
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+AIPORTAL="$REPO_DIR/bin/aiportal"
 
 # Default model
 DEFAULT_MODEL="claude-sonnet-5.5"
 # Model names come from litellm_config.yaml
-mapfile -t AVAILABLE_MODELS < <(python3 "$SCRIPT_DIR/aiportal.py" names)
+mapfile -t AVAILABLE_MODELS < <("$AIPORTAL" models)
 
 # Parse arguments
 MODEL="$DEFAULT_MODEL"
@@ -37,7 +38,7 @@ show_usage() {
     echo "  $cmd -m claude-opus-5.5           # Use specific model in current directory"
     echo "  $cmd -m gpt-5.6-terra /path       # Use specific model in specified directory"
     echo ""
-    echo "Update the model list from the MSK endpoint with: $SCRIPT_DIR/aiportal.py sync --apply"
+    echo "Update the model list from the MSK endpoint with: aiportal models sync --apply"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -87,7 +88,7 @@ echo "Model: $MODEL"
 echo ""
 
 # Set up Claude environment
-source "${SCRIPT_DIR}/setup_claude_env.sh" || exit 1
+source "$REPO_DIR/lib/claude_env.sh" || exit 1
 
 # Launch Claude CLI with selected model
 echo "Launching Claude CLI..."

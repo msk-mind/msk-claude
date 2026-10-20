@@ -11,14 +11,15 @@
 # Proxy state lives in .proxy/<hostname>/ so machines sharing this directory
 # (e.g. a shared home on a cluster) never overwrite each other's records.
 
-_EP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_EP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_EP_AIPORTAL="$_EP_DIR/bin/aiportal"
 _EP_STATE_ROOT="$_EP_DIR/.proxy"
 _EP_STATE_DIR="$_EP_STATE_ROOT/$(hostname)"
 _EP_INFO_FILE="$_EP_STATE_DIR/server_info"
 _EP_LOG_FILE="$_EP_STATE_DIR/proxy.log"
 _EP_PID_FILE="$_EP_STATE_DIR/proxy.pid"
 _EP_LOCK_FILE="$_EP_STATE_DIR/proxy.lock"
-_EP_WATCHED_FILES=("$_EP_DIR/.auth.env" "$_EP_DIR/litellm_config.yaml" "$_EP_DIR/custom_callbacks.py" "$_EP_DIR/.litellm_master_key")
+_EP_WATCHED_FILES=("$_EP_DIR/.auth.env" "$_EP_DIR/proxy/litellm_config.yaml" "$_EP_DIR/proxy/custom_callbacks.py" "$_EP_STATE_ROOT/master_key")
 _EP_STARTUP_TIMEOUT=120
 
 # Reads a server_info file into LITELLM_HOST / LITELLM_PORT / _EP_BIND
@@ -73,6 +74,7 @@ _ep_owns_proxy() {
 
 # Earlier versions kept a single set of state files at the top level. Stop a
 # background proxy recorded there on this machine, then drop those files.
+# (aiportal moves the old .litellm_master_key into .proxy/ itself.)
 _ep_migrate_legacy_state() {
     local legacy_pid="$_EP_DIR/.litellm_proxy.pid" host pid
     if [ -f "$legacy_pid" ]; then
@@ -84,7 +86,7 @@ _ep_migrate_legacy_state() {
         fi
     fi
     rm -f "$legacy_pid" "$_EP_DIR/.litellm_server_info" "$_EP_DIR/.litellm_port" \
-        "$_EP_DIR/.litellm_proxy.log" "$_EP_DIR/.litellm_proxy.lock"
+        "$_EP_DIR/.litellm_proxy.log" "$_EP_DIR/.litellm_proxy.lock" "$_EP_DIR/.opencode_msk.json"
 }
 
 # Looks for a key-accepting proxy that another machine started with MSK_PROXY_BIND=0.0.0.0
@@ -108,7 +110,7 @@ _ep_find_remote_proxy() {
 _ep_start_proxy() {
     # Never leave an earlier background proxy of ours running untracked
     if _ep_owns_proxy; then
-        "$_EP_DIR/stop_litellm_proxy.sh" > /dev/null
+        "$_EP_AIPORTAL" proxy stop > /dev/null
     fi
 
     echo "Starting a new proxy on $(hostname) (log: $_EP_LOG_FILE)..."
@@ -123,7 +125,7 @@ _ep_start_proxy() {
     old_umask=$(umask)
     umask 077
     MSK_PROXY_STATE_DIR="$_EP_STATE_DIR" nohup setsid bash -c \
-        'echo "$(hostname) $$" > "$1"; exec "$2"' _ "$_EP_PID_FILE" "$_EP_DIR/start_litellm_proxy.sh" \
+        'echo "$(hostname) $$" > "$1"; exec "$2"' _ "$_EP_PID_FILE" "$_EP_DIR/proxy/run.sh" \
         > "$_EP_LOG_FILE" 2>&1 < /dev/null &
     umask "$old_umask"
 
@@ -138,7 +140,7 @@ _ep_start_proxy() {
         if _ep_read_server_info "$_EP_INFO_FILE" &&
             [ "$(_ep_probe "$LITELLM_HOST" "$LITELLM_PORT")" = ok ]; then
             echo "LiteLLM proxy started at http://$LITELLM_HOST:$LITELLM_PORT (pid $pid)"
-            echo "It keeps running after you exit; stop it with $_EP_DIR/stop_litellm_proxy.sh"
+            echo "It keeps running after you exit; stop it with 'aiportal proxy stop'"
             return 0
         fi
         sleep 2
@@ -151,8 +153,8 @@ _ep_start_proxy() {
 }
 
 _ep_ensure_proxy() {
-    python3 "$_EP_DIR/aiportal.py" token-check || return 1
-    MSK_PROXY_KEY="$(python3 "$_EP_DIR/aiportal.py" proxy-key)" || return 1
+    "$_EP_AIPORTAL" _token-check || return 1
+    MSK_PROXY_KEY="$("$_EP_AIPORTAL" _proxy-key)" || return 1
 
     _ep_migrate_legacy_state
 
@@ -185,6 +187,7 @@ _ep_ensure_proxy() {
 
 # Serialize so two launches at once on this machine don't both start a proxy
 mkdir -p "$_EP_STATE_DIR" && chmod 700 "$_EP_STATE_ROOT" "$_EP_STATE_DIR"
+(umask 077; : >> "$_EP_LOCK_FILE")
 exec {_ep_lock_fd}> "$_EP_LOCK_FILE"
 flock "$_ep_lock_fd"
 _ep_ensure_proxy
