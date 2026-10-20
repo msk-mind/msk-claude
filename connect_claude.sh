@@ -1,19 +1,22 @@
 #!/bin/bash
 # Wrapper script to connect Claude CLI to Open WebUI
 
-# Get script directory before any directory changes
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get script directory before any directory changes (resolving the aiportal-claude symlink)
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 # Default model
-DEFAULT_MODEL="claude-sonnet-4.5"
-AVAILABLE_MODELS=("claude-sonnet-4.5" "claude-sonnet-4" "claude-3.7-sonnet" "claude-3.5-sonnet")
+DEFAULT_MODEL="claude-sonnet-5.5"
+# Model names come from litellm_config.yaml
+mapfile -t AVAILABLE_MODELS < <(python3 "$SCRIPT_DIR/aiportal.py" names)
 
 # Parse arguments
 MODEL="$DEFAULT_MODEL"
 WORK_DIR="."
 
 show_usage() {
-    echo "Usage: $0 [OPTIONS] [working_directory]"
+    local cmd
+    cmd="$(basename "$0")"
+    echo "Usage: $cmd [OPTIONS] [working_directory]"
     echo ""
     echo "Options:"
     echo "  -m, --model MODEL    Model to use (default: $DEFAULT_MODEL)"
@@ -29,15 +32,22 @@ show_usage() {
     done
     echo ""
     echo "Examples:"
-    echo "  $0                              # Use default model in current directory"
-    echo "  $0 /path/to/project             # Use default model in specified directory"
-    echo "  $0 -m claude-sonnet-4           # Use specific model in current directory"
-    echo "  $0 -m claude-3.5-sonnet /path   # Use specific model in specified directory"
+    echo "  $cmd                              # Use default model in current directory"
+    echo "  $cmd /path/to/project             # Use default model in specified directory"
+    echo "  $cmd -m claude-opus-5.5           # Use specific model in current directory"
+    echo "  $cmd -m gpt-5.6-terra /path       # Use specific model in specified directory"
+    echo ""
+    echo "Update the model list from the MSK endpoint with: $SCRIPT_DIR/aiportal.py sync --apply"
 }
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -m|--model)
+            if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                echo "Error: $1 needs a model name"
+                show_usage
+                exit 1
+            fi
             MODEL="$2"
             shift 2
             ;;
@@ -77,7 +87,7 @@ echo "Model: $MODEL"
 echo ""
 
 # Set up Claude environment
-source "${SCRIPT_DIR}/setup_claude_env.sh"
+source "${SCRIPT_DIR}/setup_claude_env.sh" || exit 1
 
 # Launch Claude CLI with selected model
 echo "Launching Claude CLI..."

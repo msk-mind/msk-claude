@@ -11,11 +11,11 @@ if [ ! -f "$SCRIPT_DIR/.auth.env" ]; then
     exit 1
 fi
 
-# Source the auth file if WEBUI_SESSION_TOKEN is not already set
-if [ -z "$WEBUI_SESSION_TOKEN" ]; then
-    echo "Loading session token from .auth.env..."
-    source "$SCRIPT_DIR/.auth.env"
-fi
+# Always load the token from .auth.env, so a refreshed token there wins over a
+# stale WEBUI_SESSION_TOKEN exported in the calling shell
+echo "Loading session token from .auth.env..."
+unset WEBUI_SESSION_TOKEN
+source "$SCRIPT_DIR/.auth.env"
 
 # Check if session token is set
 if [ -z "$WEBUI_SESSION_TOKEN" ]; then

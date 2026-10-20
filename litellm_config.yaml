@@ -1,5 +1,43 @@
 model_list:
-  # Claude Sonnet 4.5 (Latest)
+  - model_name: claude-sonnet-5.5
+    litellm_params:
+      model: openai/bedrock/us.anthropic.claude-sonnet-5-5
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+      drop_params: true
+      max_tokens: 16384
+    model_info:
+      verify_ssl: false
+      display_name: Claude Sonnet 5.5
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
+
+  - model_name: claude-sonnet-5
+    litellm_params:
+      model: openai/bedrock/us.anthropic.claude-sonnet-5
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+      drop_params: true
+      max_tokens: 16384
+    model_info:
+      verify_ssl: false
+      display_name: Claude Sonnet 5
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
+
+  - model_name: claude-sonnet-4.6
+    litellm_params:
+      model: openai/bedrock/us.anthropic.claude-sonnet-4-6
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+      drop_params: true
+      max_tokens: 16384
+    model_info:
+      verify_ssl: false
+      display_name: Claude Sonnet 4.6
+      max_input_tokens: 1000000
+      max_output_tokens: 64000
+
   - model_name: claude-sonnet-4.5
     litellm_params:
       model: openai/bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
@@ -9,57 +47,75 @@ model_list:
       max_tokens: 16384
     model_info:
       verify_ssl: false
-      max_output_tokens: 65536
+      display_name: Claude Sonnet 4.5
+      max_input_tokens: 200000
+      max_output_tokens: 64000
 
-  # Claude Sonnet 4
-  - model_name: claude-sonnet-4
+  - model_name: claude-opus-5.5
     litellm_params:
-      model: openai/bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0
+      model: openai/bedrock/us.anthropic.claude-opus-5-5
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
       drop_params: true
       max_tokens: 16384
     model_info:
       verify_ssl: false
-      max_output_tokens: 65536
+      display_name: Claude Opus 5.5
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
 
-  # Claude 3.7 Sonnet
-  - model_name: claude-3.7-sonnet
+  - model_name: claude-opus-5
     litellm_params:
-      model: openai/bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
+      model: openai/bedrock/us.anthropic.claude-opus-5
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
       drop_params: true
       max_tokens: 16384
     model_info:
       verify_ssl: false
-      max_output_tokens: 65536
+      display_name: Claude Opus 5
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
 
-  # Claude 3.5 Sonnet
-  - model_name: claude-3.5-sonnet
+  - model_name: claude-opus-4.8
     litellm_params:
-      model: openai/bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+      model: openai/bedrock/us.anthropic.claude-opus-4-8
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
       drop_params: true
-      max_tokens: 8192
+      max_tokens: 16384
     model_info:
       verify_ssl: false
-      max_output_tokens: 8192
+      display_name: Claude Opus 4.8
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
 
-  # Claude Haiku 4.5 (mapped to 3.7 Sonnet since Haiku not available)
+  - model_name: claude-opus-4.6
+    litellm_params:
+      model: openai/bedrock/us.anthropic.claude-opus-4-6-v1
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+      drop_params: true
+      max_tokens: 16384
+    model_info:
+      verify_ssl: false
+      display_name: Claude Opus 4.6
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
+
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
-      model: openai/bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0
+      model: openai/bedrock/us.anthropic.claude-sonnet-5-5
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
       drop_params: true
       max_tokens: 16384
     model_info:
       verify_ssl: false
-      max_output_tokens: 65536
+      hidden: true
+      max_input_tokens: 1000000
+      max_output_tokens: 128000
 
-  # Additional models available at the endpoint
   - model_name: amazon-nova-pro
     litellm_params:
       model: openai/bedrock-nova-pro
@@ -67,7 +123,9 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
-      max_output_tokens: 32768
+      display_name: Amazon Nova Pro
+      max_input_tokens: 300000
+      max_output_tokens: 10000
 
   - model_name: llama-3.3-70b
     litellm_params:
@@ -76,18 +134,77 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
+      display_name: Llama 3.3 70B
+      supports_vision: false
+      max_input_tokens: 128000
       max_output_tokens: 8192
 
-  - model_name: llama-3.2-90b
+  - model_name: glm-5
     litellm_params:
-      model: openai/bedrock/us.meta.llama3-2-90b-instruct-v1:0
+      model: openai/zai.glm-5
       api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
-      max_output_tokens: 8192
+      display_name: GLM-5
+      max_input_tokens: 200000
+      max_output_tokens: 128000
 
-  # Azure OpenAI GPT models
+  - model_name: qwen3-vl-235b
+    litellm_params:
+      model: openai/qwen3-vl-235b-a22b
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      display_name: Qwen3 VL 235B A22B
+      max_input_tokens: 262144
+      max_output_tokens: 32768
+
+  - model_name: gpt-5.6-terra
+    litellm_params:
+      model: openai/azure/gpt-5.6-terra
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      display_name: GPT-5.6 Terra
+      max_input_tokens: 922000
+      max_output_tokens: 128000
+
+  - model_name: gpt-5.6-luna
+    litellm_params:
+      model: openai/azure/gpt-5.6-luna
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      display_name: GPT-5.6 Luna
+      max_input_tokens: 922000
+      max_output_tokens: 128000
+
+  - model_name: gpt-5.5
+    litellm_params:
+      model: openai/azure/gpt-5.5
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      display_name: GPT-5.5
+      max_input_tokens: 922000
+      max_output_tokens: 128000
+
+  - model_name: gpt-5.4
+    litellm_params:
+      model: openai/azure/gpt-5.4
+      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
+      api_key: os.environ/WEBUI_SESSION_TOKEN
+    model_info:
+      verify_ssl: false
+      display_name: GPT-5.4
+      max_input_tokens: 922000
+      max_output_tokens: 128000
+
   - model_name: gpt-5.2
     litellm_params:
       model: openai/azure/gpt-5.2
@@ -95,7 +212,9 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
-      max_output_tokens: 16384
+      display_name: GPT-5.2
+      max_input_tokens: 272000
+      max_output_tokens: 128000
 
   - model_name: gpt-5
     litellm_params:
@@ -104,7 +223,9 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
-      max_output_tokens: 16384
+      display_name: GPT-5
+      max_input_tokens: 272000
+      max_output_tokens: 128000
 
   - model_name: o3
     litellm_params:
@@ -113,16 +234,9 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
+      display_name: o3
+      max_input_tokens: 200000
       max_output_tokens: 100000
-
-  - model_name: gpt-4o
-    litellm_params:
-      model: openai/azure/chat-gpt-4o
-      api_base: https://chat.aicopilot.aws.mskcc.org/api/v1
-      api_key: os.environ/WEBUI_SESSION_TOKEN
-    model_info:
-      verify_ssl: false
-      max_output_tokens: 16384
 
   - model_name: gpt-4.1
     litellm_params:
@@ -131,7 +245,9 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
-      max_output_tokens: 128000
+      display_name: GPT-4.1
+      max_input_tokens: 1047576
+      max_output_tokens: 32768
 
   - model_name: o1
     litellm_params:
@@ -140,8 +256,10 @@ model_list:
       api_key: os.environ/WEBUI_SESSION_TOKEN
     model_info:
       verify_ssl: false
+      display_name: o1
+      supports_function_calling: false
+      max_input_tokens: 200000
       max_output_tokens: 100000
-
 litellm_settings:
   drop_params: true
   telemetry: false
@@ -150,21 +268,34 @@ litellm_settings:
   request_timeout: 600
 
 router_settings:
+  # Each model has a single deployment, so cooldowns only replace the real
+  # upstream error (e.g. an expired token) with "No deployments available"
+  disable_cooldowns: true
   # Regular fallbacks (for model unavailable, rate limits, etc.)
-  # Note: claude-3.5-sonnet excluded due to 8192 token limit incompatibility
   fallbacks:
-    - claude-sonnet-4.5: ["claude-sonnet-4", "claude-3.7-sonnet"]
-    - claude-sonnet-4: ["claude-3.7-sonnet"]
-    - claude-haiku-4-5-20251001: ["claude-3.7-sonnet"]
-    - gpt-4.1: ["gpt-4o", "gpt-5"]
-    - gpt-4o: ["gpt-4.1", "gpt-5"]
+    - claude-sonnet-5.5: ["claude-sonnet-5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+    - claude-sonnet-5: ["claude-sonnet-5.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+    - claude-sonnet-4.6: ["claude-sonnet-5.5", "claude-sonnet-4.5"]
+    - claude-sonnet-4.5: ["claude-sonnet-4.6", "claude-sonnet-5.5"]
+    - claude-opus-5.5: ["claude-opus-5", "claude-opus-4.8"]
+    - claude-opus-5: ["claude-opus-5.5", "claude-opus-4.8"]
+    - claude-opus-4.8: ["claude-opus-5", "claude-opus-4.6"]
+    - claude-haiku-4-5-20251001: ["claude-sonnet-5", "claude-sonnet-4.6"]
+    - gpt-5.6-terra: ["gpt-5.6-luna", "gpt-5.5"]
+    - gpt-5.6-luna: ["gpt-5.6-terra", "gpt-5.5"]
+    - gpt-4.1: ["gpt-5"]
   # Content policy fallbacks (for content filtering errors)
   content_policy_fallbacks:
-    - claude-sonnet-4.5: ["claude-sonnet-4", "claude-3.7-sonnet"]
-    - claude-sonnet-4: ["claude-3.7-sonnet"]
-    - claude-haiku-4-5-20251001: ["claude-3.7-sonnet"]
-    - gpt-4.1: ["gpt-4o"]
-    - gpt-4o: ["gpt-4.1"]
+    - claude-sonnet-5.5: ["claude-sonnet-5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+    - claude-sonnet-5: ["claude-sonnet-5.5", "claude-sonnet-4.6", "claude-sonnet-4.5"]
+    - claude-sonnet-4.6: ["claude-sonnet-5.5", "claude-sonnet-4.5"]
+    - claude-sonnet-4.5: ["claude-sonnet-4.6", "claude-sonnet-5.5"]
+    - claude-opus-5.5: ["claude-opus-5", "claude-opus-4.8"]
+    - claude-opus-5: ["claude-opus-5.5", "claude-opus-4.8"]
+    - claude-opus-4.8: ["claude-opus-5", "claude-opus-4.6"]
+    - claude-haiku-4-5-20251001: ["claude-sonnet-5", "claude-sonnet-4.6"]
+    - gpt-4.1: ["gpt-5"]
 
 general_settings:
-  master_key: sk-1234
+  # Random per-user secret from .litellm_master_key (set by start_litellm.py)
+  master_key: os.environ/LITELLM_MASTER_KEY
