@@ -50,7 +50,13 @@ fi
 
 # --- 2. Private Python environment --------------------------------------------
 step "Setting up the Python environment in .venv"
-if [ ! -x "$VENV/bin/python" ]; then
+if ! "$VENV/bin/python" -c "" 2> /dev/null; then
+    # Missing, or broken (e.g. its Python was upgraded or removed): start over
+    if [ -e "$VENV" ]; then
+        echo "Rebuilding $VENV (its Python no longer works)"
+        rm -rf "$VENV"
+    fi
+    REINSTALL=1
     if command -v uv > /dev/null; then
         uv venv --quiet --python ">=$MIN_PYTHON" "$VENV" || fail "couldn't create $VENV"
     else

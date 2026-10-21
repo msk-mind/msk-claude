@@ -128,12 +128,16 @@ def group_of(name):
 # --- token ------------------------------------------------------------------
 
 def load_token():
-    """The token in .auth.env wins over the environment, so refreshing the file always takes effect."""
+    """The token in .auth.env, the only place the proxy reads it from."""
     if os.path.exists(AUTH_PATH):
         m = re.search(r"WEBUI_SESSION_TOKEN=['\"]?([^'\"\n]+)", open(AUTH_PATH).read())
         if m:
             return m.group(1)
-    return os.environ.get("WEBUI_SESSION_TOKEN")
+    return None
+
+
+ENV_TOKEN_HINT = ("WEBUI_SESSION_TOKEN is set in your shell, but the proxy only reads .auth.env.\n"
+                  "Save it there with: printenv WEBUI_SESSION_TOKEN | aiportal token set")
 
 
 def token_expiry(token):
@@ -202,7 +206,10 @@ def cmd_token_check():
         print(f"Note: {AUTH_PATH} was readable by other users; restricted it to you.")
     token = load_token()
     if not token:
-        print(f"Error: WEBUI_SESSION_TOKEN not found in {AUTH_PATH}\n\n{TOKEN_HELP}")
+        if os.environ.get("WEBUI_SESSION_TOKEN"):
+            print(f"Error: no token in {AUTH_PATH}.\n{ENV_TOKEN_HINT}")
+        else:
+            print(f"Error: WEBUI_SESSION_TOKEN not found in {AUTH_PATH}\n\n{TOKEN_HELP}")
         return 1
     exp = token_expiry(token)
     if exp is None:
@@ -515,7 +522,9 @@ def cmd_doctor():
     print("Session token")
     token = load_token()
     if not token:
-        report(False, ".auth.env", "no token", "run: aiportal token set")
+        report(False, ".auth.env", "no token",
+               ENV_TOKEN_HINT.replace("\n", "\n            ") if os.environ.get("WEBUI_SESSION_TOKEN")
+               else "run: aiportal token set")
     else:
         exp = token_expiry(token)
         if exp is not None:
