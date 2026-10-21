@@ -4,10 +4,14 @@ import os
 import sys
 import socket
 
-# Add script directory to Python path for custom callbacks
+# Runs the LiteLLM proxy (started by proxy/run.sh)
+
+# proxy/ for custom_callbacks, lib/ for aiportal
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+REPO_DIR = os.path.dirname(SCRIPT_DIR)
+for path in (SCRIPT_DIR, os.path.join(REPO_DIR, "lib")):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # Disable SSL verification globally
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -31,10 +35,19 @@ TCPConnector.__init__ = patched_init
 BIND_HOST = os.environ.get("MSK_PROXY_BIND", "127.0.0.1")
 
 def find_available_port(start_port=22660, max_attempts=100):
-    """Find the next available port starting from start_port."""
-    for port in range(start_port, start_port + max_attempts):
+    """Find a free port, preferring the one a previous proxy used (MSK_PROXY_PORT).
+
+    Reusing the previous port lets running opencode / Claude Code sessions keep
+    working across a restart. SO_REUSEADDR matches how uvicorn binds, so a port
+    whose old connections are still in TIME_WAIT counts as free.
+    """
+    preferred = os.environ.get("MSK_PROXY_PORT")
+    candidates = ([int(preferred)] if preferred and preferred.isdigit() else []) + \
+        list(range(start_port, start_port + max_attempts))
+    for port in candidates:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((BIND_HOST, port))
                 return port
         except OSError:
@@ -51,7 +64,7 @@ litellm.callbacks = [strip_params_callback]
 print("Registered custom callback: StripUnsupportedParams")
 
 if __name__ == "__main__":
-    # Clients must present this secret (read from .litellm_master_key)
+    # Clients must present this secret (read from .proxy/master_key)
     import aiportal
     os.environ["LITELLM_MASTER_KEY"] = aiportal.ensure_proxy_key()
     if not os.environ["LITELLM_MASTER_KEY"]:
@@ -61,7 +74,7 @@ if __name__ == "__main__":
     hostname = socket.gethostname()
 
     # Per-machine state, so machines sharing this directory don't overwrite each other
-    state_dir = os.environ.get("MSK_PROXY_STATE_DIR") or os.path.join(SCRIPT_DIR, ".proxy", hostname)
+    state_dir = os.environ.get("MSK_PROXY_STATE_DIR") or aiportal.host_state_dir(hostname)
     os.makedirs(state_dir, mode=0o700, exist_ok=True)
 
     # Written last: its appearance tells the launch scripts where to connect
@@ -79,7 +92,7 @@ if __name__ == "__main__":
 
     sys.argv = [
         "litellm",
-        "--config", "litellm_config.yaml",
+        "--config", os.path.join(SCRIPT_DIR, "litellm_config.yaml"),
         "--port", str(port),
         "--host", BIND_HOST
     ]

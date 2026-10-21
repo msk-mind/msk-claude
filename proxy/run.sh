@@ -2,9 +2,10 @@
 # Start LiteLLM proxy to translate between Claude CLI and Open WebUI
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Check if .auth.env exists
-if [ ! -f "$SCRIPT_DIR/.auth.env" ]; then
+if [ ! -f "$REPO_DIR/.auth.env" ]; then
     echo "Error: .auth.env file not found"
     echo "Please create .auth.env with your session token:"
     echo "  export WEBUI_SESSION_TOKEN='your-token-here'"
@@ -15,7 +16,7 @@ fi
 # stale WEBUI_SESSION_TOKEN exported in the calling shell
 echo "Loading session token from .auth.env..."
 unset WEBUI_SESSION_TOKEN
-source "$SCRIPT_DIR/.auth.env"
+source "$REPO_DIR/.auth.env"
 
 # Check if session token is set
 if [ -z "$WEBUI_SESSION_TOKEN" ]; then
@@ -43,4 +44,4 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 cd "$SCRIPT_DIR"
-exec python3 start_litellm.py
+exec python3 server.py

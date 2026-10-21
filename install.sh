@@ -1,13 +1,12 @@
 #!/bin/bash
-# Install the aiportal-opencode and aiportal-claude commands into ~/.local/bin
+# Install the aiportal-opencode, aiportal-claude and aiportal commands into ~/.local/bin
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 BIN_DIR="${MSK_BIN_DIR:-$HOME/.local/bin}"
 
 mkdir -p "$BIN_DIR"
-for pair in "aiportal-opencode:connect_opencode.sh" "aiportal-claude:connect_claude.sh"; do
-    name="${pair%%:*}"
-    target="$SCRIPT_DIR/${pair#*:}"
+for name in aiportal-opencode aiportal-claude aiportal; do
+    target="$SCRIPT_DIR/bin/$name"
     link="$BIN_DIR/$name"
     if [ -e "$link" ] && [ ! -L "$link" ]; then
         echo "Skipping $link: a file that is not a symlink already exists there"
@@ -17,10 +16,10 @@ for pair in "aiportal-opencode:connect_opencode.sh" "aiportal-claude:connect_cla
     echo "Installed $link -> $target"
 done
 
-# Remove links installed under earlier command names
-for old in msk msk-claude; do
-    link="$BIN_DIR/$old"
-    if [ -L "$link" ] && [[ "$(readlink "$link")" == "$SCRIPT_DIR/"* ]]; then
+# Remove links from earlier versions (e.g. msk, msk-claude) that point into this
+# repo at files that no longer exist
+for link in "$BIN_DIR"/*; do
+    if [ -L "$link" ] && [ ! -e "$link" ] && [[ "$(readlink "$link")" == "$SCRIPT_DIR/"* ]]; then
         rm "$link"
         echo "Removed old command $link"
     fi
@@ -28,10 +27,10 @@ done
 
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
-    *) echo "Note: $BIN_DIR is not on your PATH; add it to use aiportal-opencode / aiportal-claude" ;;
+    *) echo "Note: $BIN_DIR is not on your PATH; add it to use the aiportal commands" ;;
 esac
 
-# Earlier versions of connect_opencode.sh wrote the msk provider into the global
+# Earlier versions of the opencode launcher wrote the msk provider into the global
 # opencode config and never removed it. The config now comes from OPENCODE_CONFIG,
 # so remove those leftovers (with a backup) to keep retired models from lingering.
 OPENCODE_CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"

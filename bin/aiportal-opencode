@@ -2,15 +2,18 @@
 # Wrapper script to connect opencode to Open WebUI via LiteLLM proxy
 
 # Get script directory before any directory changes (resolving the aiportal-opencode symlink)
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+AIPORTAL="$REPO_DIR/bin/aiportal"
 
 # Default model
 DEFAULT_MODEL="claude-sonnet-5.5"
 # Model names come from litellm_config.yaml
-mapfile -t AVAILABLE_MODELS < <(python3 "$SCRIPT_DIR/aiportal.py" names)
+mapfile -t AVAILABLE_MODELS < <("$AIPORTAL" models)
 
 MODEL="$DEFAULT_MODEL"
-WORK_DIR="."
+WORK_DIR=""
+RESUME_ARGS=()
+FORK=0
 
 show_usage() {
     local cmd
@@ -19,6 +22,9 @@ show_usage() {
     echo ""
     echo "Options:"
     echo "  -m, --model MODEL    Model to use (default: $DEFAULT_MODEL)"
+    echo "  -c, --continue       Continue the most recent session in the directory"
+    echo "  -r, --resume ID      Resume a specific session (inside opencode, /sessions lists them)"
+    echo "      --fork           With -c or -r, continue in a copy and leave the original as is"
     echo "  -h, --help           Show this help message"
     echo ""
     echo "Available models:"
@@ -35,8 +41,10 @@ show_usage() {
     echo "  $cmd /path/to/project         # Use default model in specified directory"
     echo "  $cmd -m gpt-5.5               # Use specific model in current directory"
     echo "  $cmd -m claude-opus-5.5 /path # Use specific model in specified directory"
+    echo "  $cmd -c                       # Pick up where you left off"
+    echo "  $cmd -r ses_abc123 --fork     # Branch off an earlier session"
     echo ""
-    echo "Update the model list from the MSK endpoint with: $SCRIPT_DIR/aiportal.py sync --apply"
+    echo "Update the model list from the MSK endpoint with: aiportal models sync --apply"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -50,6 +58,22 @@ while [[ $# -gt 0 ]]; do
             MODEL="$2"
             shift 2
             ;;
+        -c|--continue)
+            RESUME_ARGS+=(--continue)
+            shift
+            ;;
+        -r|--resume|-s|--session)
+            if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                echo "Error: $1 needs a session ID (inside opencode, /sessions lists them; -c continues the latest)"
+                exit 1
+            fi
+            RESUME_ARGS+=(--session "$2")
+            shift 2
+            ;;
+        --fork)
+            FORK=1
+            shift
+            ;;
         -h|--help)
             show_usage
             exit 0
@@ -60,12 +84,24 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
+            if [ -n "$WORK_DIR" ]; then
+                echo "Error: more than one working directory given ($WORK_DIR, $1)"
+                exit 1
+            fi
             WORK_DIR="$1"
             shift
-            break
             ;;
     esac
 done
+WORK_DIR="${WORK_DIR:-.}"
+
+if [ "$FORK" = 1 ]; then
+    if [ ${#RESUME_ARGS[@]} -eq 0 ]; then
+        echo "Error: --fork needs -c or -r"
+        exit 1
+    fi
+    RESUME_ARGS+=(--fork)
+fi
 
 # Validate model selection
 if [[ ! " ${AVAILABLE_MODELS[@]} " =~ " ${MODEL} " ]]; then
@@ -82,7 +118,7 @@ fi
 WORK_DIR="$(cd "$WORK_DIR" && pwd)"
 
 # Find a running proxy, or start one
-source "$SCRIPT_DIR/ensure_proxy.sh" || exit 1
+source "$REPO_DIR/lib/ensure_proxy.sh" || exit 1
 
 LITELLM_BASE_URL="http://${LITELLM_HOST}:${LITELLM_PORT}/v1"
 
@@ -93,14 +129,14 @@ echo ""
 
 # Generate an MSK-only config and layer it over the user's global opencode config
 # via OPENCODE_CONFIG, so the global ~/.config/opencode/opencode.json is never modified
-export OPENCODE_CONFIG="$SCRIPT_DIR/.opencode_msk.json"
+export OPENCODE_CONFIG="$REPO_DIR/.proxy/$(hostname)/opencode.json"
 
-MSK_MODELS_JSON="$(python3 "$SCRIPT_DIR/aiportal.py" opencode-models)" || {
+MSK_MODELS_JSON="$("$AIPORTAL" _opencode-models)" || {
     echo "Error: Failed to read models from litellm_config.yaml"
     exit 1
 }
 
-python3 - "$OPENCODE_CONFIG" "$LITELLM_BASE_URL" "$MODEL" "$MSK_MODELS_JSON" <<'PYEOF' || { echo "Error: Failed to write opencode config"; exit 1; }
+(umask 077; python3 - "$OPENCODE_CONFIG" "$LITELLM_BASE_URL" "$MODEL" "$MSK_MODELS_JSON") <<'PYEOF' || { echo "Error: Failed to write opencode config"; exit 1; }
 import json, sys
 
 config_path, base_url, model, models_json = sys.argv[1:5]
@@ -125,4 +161,4 @@ echo "Launching opencode..."
 echo "Press 'q' or Ctrl+C to quit"
 echo ""
 
-exec opencode "$WORK_DIR"
+exec opencode "${RESUME_ARGS[@]}" "$WORK_DIR"
