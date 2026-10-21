@@ -168,6 +168,8 @@ By default the proxy only accepts connections from its own machine. To use one p
 
 **Errors starting with `[MSK proxy]`** include the fix: refresh `.auth.env` for a rejected token, or run `aiportal models sync --apply` for a model the portal no longer offers.
 
+**"No connected db" (HTTP 400).** The proxy rejected the session's key: LiteLLM reports a key it doesn't recognize this way. It happens when a session outlives the key it started with, for example after `.proxy/master_key` was deleted and recreated. Quit and resume the session with `aiportal-opencode -c` or `aiportal-claude -c` to pick up the current key. Ordinary proxy restarts don't cause this: the proxy comes back on the same port with the same key.
+
 **The proxy won't start.** The launch command prints the end of the log. Run `aiportal proxy start` to see the full output in the foreground.
 
 **Claude Code hangs on the "trust this folder" prompt** the first time you use it in a directory. Run plain `claude` there once to answer the prompt, then use `aiportal-claude`.

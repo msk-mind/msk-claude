@@ -35,10 +35,19 @@ TCPConnector.__init__ = patched_init
 BIND_HOST = os.environ.get("MSK_PROXY_BIND", "127.0.0.1")
 
 def find_available_port(start_port=22660, max_attempts=100):
-    """Find the next available port starting from start_port."""
-    for port in range(start_port, start_port + max_attempts):
+    """Find a free port, preferring the one a previous proxy used (MSK_PROXY_PORT).
+
+    Reusing the previous port lets running opencode / Claude Code sessions keep
+    working across a restart. SO_REUSEADDR matches how uvicorn binds, so a port
+    whose old connections are still in TIME_WAIT counts as free.
+    """
+    preferred = os.environ.get("MSK_PROXY_PORT")
+    candidates = ([int(preferred)] if preferred and preferred.isdigit() else []) + \
+        list(range(start_port, start_port + max_attempts))
+    for port in candidates:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind((BIND_HOST, port))
                 return port
         except OSError:

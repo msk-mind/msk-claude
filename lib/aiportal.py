@@ -450,11 +450,22 @@ def cmd_proxy_stop():
     if pid is None:
         print(f"No background proxy running on {socket.gethostname()}")
     else:
-        # The proxy runs in its own session, so its pid is also its process group id
-        try:
-            os.killpg(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            os.kill(pid, signal.SIGTERM)
+        # The proxy runs in its own session, so its pid is also its process group id.
+        # Wait for it to exit so its port is free for a replacement.
+        for sig, wait in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+            try:
+                os.killpg(pid, sig)
+            except ProcessLookupError:
+                break
+            for _ in range(wait * 10):
+                try:
+                    os.kill(pid, 0)
+                except ProcessLookupError:
+                    break
+                time.sleep(0.1)
+            else:
+                continue
+            break
         print(f"Stopped the proxy (pid {pid})")
     for name in ("proxy.pid", "server_info"):
         try:

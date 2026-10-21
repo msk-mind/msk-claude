@@ -108,6 +108,10 @@ _ep_find_remote_proxy() {
 }
 
 _ep_start_proxy() {
+    # Come back on the same port, so sessions already running keep working
+    local previous_port=""
+    _ep_read_server_info "$_EP_INFO_FILE" && previous_port="$LITELLM_PORT"
+
     # Never leave an earlier background proxy of ours running untracked
     if _ep_owns_proxy; then
         "$_EP_AIPORTAL" proxy stop > /dev/null
@@ -124,7 +128,7 @@ _ep_start_proxy() {
     local old_umask pid="" waited=0
     old_umask=$(umask)
     umask 077
-    MSK_PROXY_STATE_DIR="$_EP_STATE_DIR" nohup setsid bash -c \
+    MSK_PROXY_STATE_DIR="$_EP_STATE_DIR" MSK_PROXY_PORT="$previous_port" nohup setsid bash -c \
         'echo "$(hostname) $$" > "$1"; exec "$2"' _ "$_EP_PID_FILE" "$_EP_DIR/proxy/run.sh" \
         > "$_EP_LOG_FILE" 2>&1 < /dev/null &
     umask "$old_umask"
