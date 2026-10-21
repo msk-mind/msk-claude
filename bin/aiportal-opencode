@@ -11,7 +11,9 @@ DEFAULT_MODEL="claude-sonnet-5.5"
 mapfile -t AVAILABLE_MODELS < <("$AIPORTAL" models)
 
 MODEL="$DEFAULT_MODEL"
-WORK_DIR="."
+WORK_DIR=""
+RESUME_ARGS=()
+FORK=0
 
 show_usage() {
     local cmd
@@ -20,6 +22,9 @@ show_usage() {
     echo ""
     echo "Options:"
     echo "  -m, --model MODEL    Model to use (default: $DEFAULT_MODEL)"
+    echo "  -c, --continue       Continue the most recent session in the directory"
+    echo "  -r, --resume ID      Resume a specific session (inside opencode, /sessions lists them)"
+    echo "      --fork           With -c or -r, continue in a copy and leave the original as is"
     echo "  -h, --help           Show this help message"
     echo ""
     echo "Available models:"
@@ -36,6 +41,8 @@ show_usage() {
     echo "  $cmd /path/to/project         # Use default model in specified directory"
     echo "  $cmd -m gpt-5.5               # Use specific model in current directory"
     echo "  $cmd -m claude-opus-5.5 /path # Use specific model in specified directory"
+    echo "  $cmd -c                       # Pick up where you left off"
+    echo "  $cmd -r ses_abc123 --fork     # Branch off an earlier session"
     echo ""
     echo "Update the model list from the MSK endpoint with: aiportal models sync --apply"
 }
@@ -51,6 +58,22 @@ while [[ $# -gt 0 ]]; do
             MODEL="$2"
             shift 2
             ;;
+        -c|--continue)
+            RESUME_ARGS+=(--continue)
+            shift
+            ;;
+        -r|--resume|-s|--session)
+            if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                echo "Error: $1 needs a session ID (inside opencode, /sessions lists them; -c continues the latest)"
+                exit 1
+            fi
+            RESUME_ARGS+=(--session "$2")
+            shift 2
+            ;;
+        --fork)
+            FORK=1
+            shift
+            ;;
         -h|--help)
             show_usage
             exit 0
@@ -61,12 +84,24 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
+            if [ -n "$WORK_DIR" ]; then
+                echo "Error: more than one working directory given ($WORK_DIR, $1)"
+                exit 1
+            fi
             WORK_DIR="$1"
             shift
-            break
             ;;
     esac
 done
+WORK_DIR="${WORK_DIR:-.}"
+
+if [ "$FORK" = 1 ]; then
+    if [ ${#RESUME_ARGS[@]} -eq 0 ]; then
+        echo "Error: --fork needs -c or -r"
+        exit 1
+    fi
+    RESUME_ARGS+=(--fork)
+fi
 
 # Validate model selection
 if [[ ! " ${AVAILABLE_MODELS[@]} " =~ " ${MODEL} " ]]; then
@@ -126,4 +161,4 @@ echo "Launching opencode..."
 echo "Press 'q' or Ctrl+C to quit"
 echo ""
 
-exec opencode "$WORK_DIR"
+exec opencode "${RESUME_ARGS[@]}" "$WORK_DIR"

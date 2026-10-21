@@ -54,6 +54,19 @@ aiportal-claude
 aiportal-claude -m claude-opus-5.5 ~/project
 ```
 
+### Resuming Sessions
+
+Both launchers can pick up an earlier session in the same directory:
+
+| | opencode | Claude Code |
+|---|---|---|
+| Continue the most recent session | `aiportal-opencode -c` | `aiportal-claude -c` |
+| Resume a specific session | `aiportal-opencode -r <session-id>` | `aiportal-claude -r <session-id>` |
+| Choose from a list | `/sessions` inside opencode | `aiportal-claude -r` |
+| Continue in a copy, leaving the original as is | add `--fork` | add `--fork` |
+
+With `aiportal-claude`, `-m` sets the model for the resumed conversation. Options and the directory can come in any order, e.g. `aiportal-opencode ~/project -c`.
+
 ### Managing the Proxy and Models
 
 You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-claude` check your token, reuse this machine's proxy if it's running, and otherwise start one in the background. A proxy keeps running after you exit, and is restarted automatically when `.auth.env` or the proxy config changes. Use `aiportal` for everything else:
