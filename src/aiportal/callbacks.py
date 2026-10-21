@@ -48,17 +48,17 @@ def add_chat_id(d: dict, path: str = "root") -> None:
 ERROR_HINTS = [
     (
         lambda status, text: status in (401, 403) or "401 Unauthorized" in text,
-        "MSK rejected the session token (expired or invalid). Put a fresh token in "
-        ".auth.env; the proxy restarts automatically on the next aiportal-opencode / aiportal-claude launch.",
+        "MSK rejected the session token (expired or invalid). Run 'aiportal token set' "
+        "with a fresh token; the proxy restarts automatically on the next aiportal-opencode / aiportal-claude launch.",
     ),
     (
         lambda status, text: "Model not found" in text,
         "The MSK endpoint no longer offers this model. "
-        "Run 'aiportal models sync --apply' to update the model list.",
+        "Update aiportal (uv tool upgrade aiportal) to get the current model list.",
     ),
     (
         lambda status, text: "'startswith'" in text,
-        "The MSK endpoint rejected the request format; check add_chat_id in proxy/custom_callbacks.py.",
+        "The MSK endpoint rejected the request format; check add_chat_id in aiportal/callbacks.py.",
     ),
 ]
 

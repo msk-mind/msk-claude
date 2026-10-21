@@ -1,11 +1,11 @@
-# Session token
-*.env
-
-# Runtime state: proxy key, per-machine proxy state, logs and opencode config
-.proxy/
-
 __pycache__/
+.venv/
+dist/
+build/
+*.egg-info/
 
-# Files from earlier versions (moved into .proxy/ on the next launch)
+# State from the clone-based setup (aiportal setup moves it to ~/.config and ~/.local/state)
+*.env
+.proxy/
 .litellm_master_key
 .opencode_msk.json

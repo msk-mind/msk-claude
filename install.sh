@@ -1,65 +1,31 @@
 #!/bin/bash
-# Install the aiportal-opencode, aiportal-claude and aiportal commands into ~/.local/bin
+# Install aiportal from this clone and move over from the clone-based setup.
+#
+# Most people don't need a clone at all:
+#   uv tool install git+https://github.com/msk-mind/msk-claude && aiportal setup
+#
+# This script is for existing users of the clone-based setup: run it after
+# `git pull` to install the package and move your token over.
 
+set -e
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-BIN_DIR="${MSK_BIN_DIR:-$HOME/.local/bin}"
 
-mkdir -p "$BIN_DIR"
-for name in aiportal-opencode aiportal-claude aiportal; do
-    target="$SCRIPT_DIR/bin/$name"
-    link="$BIN_DIR/$name"
-    if [ -e "$link" ] && [ ! -L "$link" ]; then
-        echo "Skipping $link: a file that is not a symlink already exists there"
-        continue
-    fi
-    ln -sfn "$target" "$link"
-    echo "Installed $link -> $target"
-done
-
-# Remove links from earlier versions (e.g. msk, msk-claude) that point into this
-# repo at files that no longer exist
-for link in "$BIN_DIR"/*; do
-    if [ -L "$link" ] && [ ! -e "$link" ] && [[ "$(readlink "$link")" == "$SCRIPT_DIR/"* ]]; then
-        rm "$link"
-        echo "Removed old command $link"
-    fi
-done
+if command -v uv > /dev/null; then
+    # --force replaces the old command links in ~/.local/bin
+    uv tool install --force --reinstall "$SCRIPT_DIR"
+    BIN_DIR="$(uv tool dir --bin)"
+elif command -v pipx > /dev/null; then
+    pipx install --force "$SCRIPT_DIR"
+    BIN_DIR="${PIPX_BIN_DIR:-$HOME/.local/bin}"
+else
+    echo "Error: aiportal installs with uv (or pipx). Install uv first:"
+    echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
 
 case ":$PATH:" in
     *":$BIN_DIR:"*) ;;
-    *) echo "Note: $BIN_DIR is not on your PATH; add it to use the aiportal commands" ;;
+    *) echo "Note: $BIN_DIR is not on your PATH; run 'uv tool update-shell' and open a new terminal." ;;
 esac
 
-# Earlier versions of the opencode launcher wrote the msk provider into the global
-# opencode config and never removed it. The config now comes from OPENCODE_CONFIG,
-# so remove those leftovers (with a backup) to keep retired models from lingering.
-OPENCODE_CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
-if [ -f "$OPENCODE_CONFIG_FILE" ]; then
-    python3 - "$OPENCODE_CONFIG_FILE" <<'PYEOF'
-import json, shutil, sys, time
-
-path = sys.argv[1]
-with open(path) as f:
-    config = json.load(f)
-
-changed = False
-if "msk" in config.get("provider", {}):
-    del config["provider"]["msk"]
-    if not config["provider"]:
-        del config["provider"]
-    changed = True
-if str(config.get("model", "")).startswith("msk/"):
-    del config["model"]
-    changed = True
-
-if changed:
-    backup = f"{path}.pre-msk-cleanup.{time.strftime('%Y%m%d%H%M%S')}"
-    shutil.copy2(path, backup)
-    with open(path, "w") as f:
-        json.dump(config, f, indent=2)
-    print(f"Removed leftover msk settings from {path} (backup: {backup})")
-PYEOF
-fi
-
-echo ""
-echo "Done. Run 'aiportal-opencode' to start opencode or 'aiportal-claude' to start Claude Code."
+exec "$BIN_DIR/aiportal" setup --import "$SCRIPT_DIR"

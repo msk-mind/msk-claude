@@ -10,29 +10,30 @@ aiportal-opencode -m gpt-5.6-terra    # or any other model on the portal
 aiportal-claude                       # Claude Code
 ```
 
-## Quick Start
+## Install
 
-1. **Install dependencies**
+You need [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and opencode or Claude Code.
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+uv tool install git+https://github.com/msk-mind/msk-claude
+aiportal setup
+```
 
-2. **Save your session token.** Log in to https://chat.aicopilot.aws.mskcc.org, open Developer Tools (F12; Cmd+Option+I on a Mac), go to the site's cookies (Chrome/Edge: Application tab; Firefox/Safari: Storage tab) and copy the value of the `token` cookie. Put it in `.auth.env` in this directory:
+`aiportal setup` asks for your session token and checks the whole setup. To get the token: log in to https://chat.aicopilot.aws.mskcc.org, open Developer Tools (F12; Cmd+Option+I on a Mac), go to the site's cookies (Chrome/Edge: Application tab; Firefox/Safari: Storage tab) and copy the value of the `token` cookie.
 
-   ```bash
-   export WEBUI_SESSION_TOKEN='your-token-here'
-   ```
+Tokens last 14 days. When yours runs out, the launch commands stop and ask you to run `aiportal token set` with a fresh one; they also warn you 2 days ahead.
 
-   Tokens last 14 days. `aiportal token` shows when yours expires; the launch commands warn you 2 days ahead and stop with these steps once it has expired.
+**Update** with `uv tool upgrade aiportal`, which also brings the latest model list. **Uninstall** with `aiportal proxy stop && uv tool uninstall aiportal`; your token and state stay in `~/.config/aiportal` and `~/.local/state/aiportal` until you delete them.
 
-3. **Install the commands**
+### Coming from the Clone-Based Setup
 
-   ```bash
-   ./install.sh
-   ```
+If you used an earlier version from a clone of this repository, update the clone and run its installer once:
 
-   This links `aiportal-opencode`, `aiportal-claude` and `aiportal` into `~/.local/bin`.
+```bash
+cd path/to/msk-claude && git pull && ./install.sh
+```
+
+It installs the package, replaces the old command links, stops the old proxy and moves your token and proxy key to their new place, so sessions you already have open keep working. It then lists the old files in the clone that you can delete. After that you don't need the clone.
 
 ## Usage
 
@@ -52,6 +53,7 @@ Your global opencode config (`~/.config/opencode/opencode.json`) is never modifi
 ```bash
 aiportal-claude
 aiportal-claude -m claude-opus-5.5 ~/project
+eval "$(aiportal env)" && claude      # or set up the environment and run claude yourself
 ```
 
 ### Resuming Sessions
@@ -69,19 +71,22 @@ With `aiportal-claude`, `-m` sets the model for the resumed conversation. Option
 
 ### Managing the Proxy and Models
 
-You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-claude` check your token, reuse this machine's proxy if it's running, and otherwise start one in the background. A proxy keeps running after you exit, and is restarted automatically when `.auth.env` or the proxy config changes. Use `aiportal` for everything else:
+You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-claude` check your token, reuse this machine's proxy if it's running, and otherwise start one in the background. A proxy keeps running after you exit, and is restarted automatically (on the same port, so open sessions keep working) when your token, its key or aiportal itself changes. Use `aiportal` for everything else:
 
 | Command | What it does |
 |---|---|
+| `aiportal setup` | First-time setup: token, moving over from the clone-based setup, checks |
+| `aiportal doctor` | Check the whole setup and say what to fix |
+| `aiportal token` | Show when your session token expires |
+| `aiportal token set` | Save a new session token (checked with the portal first) |
 | `aiportal proxy status` | Where the proxy is running and whether it answers |
 | `aiportal proxy logs` | Follow this machine's proxy log |
 | `aiportal proxy stop` | Stop this machine's background proxy |
 | `aiportal proxy start` | Run the proxy in the foreground, to watch its output |
 | `aiportal models` | List the configured models |
-| `aiportal models sync` | Show models the portal has added or retired |
-| `aiportal models sync --apply` | Update the config and the list below to match the portal |
+| `aiportal models sync` | Show models the portal has added or retired, compared with this version's list |
 | `aiportal models sync --test` | Send a one-line prompt to every configured model |
-| `aiportal token` | Check your session token |
+| `aiportal env` | Print the environment for running `claude` yourself |
 
 ### Available Models
 
@@ -114,7 +119,7 @@ You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-cl
 - `qwen3-vl-235b` - Qwen3 VL 235B A22B - 262,144 context / 32,768 max output
 <!-- END MODEL LIST -->
 
-The default is `claude-sonnet-5.5`. Haiku isn't available on the portal; Claude Code's Haiku requests go to Claude Sonnet 5.5. `aiportal models sync` skips the portal's assistant presets (such as Cost Advisor) and its auto router.
+The default is `claude-sonnet-5.5`. Haiku isn't available on the portal; Claude Code's Haiku requests go to Claude Sonnet 5.5.
 
 ## How It Works
 
@@ -122,43 +127,25 @@ The default is `claude-sonnet-5.5`. Haiku isn't available on the portal; Claude 
 opencode / Claude Code ──> LiteLLM proxy (localhost) ──> MSK AI Portal (Open WebUI) ──> models
 ```
 
-The proxy accepts OpenAI-format requests (opencode) and Anthropic-format requests (Claude Code) and forwards them to the portal with your session token. Along the way it (`proxy/custom_callbacks.py`):
+The proxy accepts OpenAI-format requests (opencode) and Anthropic-format requests (Claude Code) and forwards them to the portal with your session token. Along the way it (`aiportal/callbacks.py`):
 
 - removes parameters the portal doesn't support, and adds the `chat_id` field the portal requires
 - puts a plain-language explanation in front of common errors, such as an expired token or a retired model
 
-### Repository Layout
+### Where Things Live
 
 ```
-bin/
-  aiportal-opencode     launch opencode
-  aiportal-claude       launch Claude Code
-  aiportal              manage the proxy, models and token
-lib/
-  aiportal.py           shared logic: model list, token check, proxy key, model sync
-  ensure_proxy.sh       find, start or restart the background proxy (used by the launchers)
-  claude_env.sh         Claude Code environment (source it to run `claude` yourself)
-proxy/
-  litellm_config.yaml   models, fallbacks and proxy settings (the model list's single source)
-  custom_callbacks.py   request fixes and error hints
-  server.py             starts LiteLLM with the right port, key and state directory
-  run.sh                loads .auth.env and runs server.py
-install.sh              link the commands into ~/.local/bin
-```
-
-Created at runtime and not in git:
-
-```
-.auth.env               your session token
-.proxy/
+~/.config/aiportal/
+  auth.env              your session token
+~/.local/state/aiportal/
   master_key            secret the launchers use to authenticate to the proxy
   <hostname>/           one directory per machine
-    server_info         where the proxy listens
+    server_info         where the proxy listens, and what it was started with
     proxy.pid, proxy.log, proxy.lock
     opencode.json       opencode config generated at launch
 ```
 
-Proxy state is kept per machine, so machines that share your home directory (on a cluster, for example) don't interfere with each other.
+Both are readable only by you, and follow `XDG_CONFIG_HOME` / `XDG_STATE_HOME` (or `AIPORTAL_CONFIG_DIR` / `AIPORTAL_STATE_DIR`). Proxy state is kept per machine, so machines that share your home directory (on a cluster, for example) don't interfere with each other.
 
 ### Sharing One Proxy Between Machines
 
@@ -166,18 +153,39 @@ By default the proxy only accepts connections from its own machine. To use one p
 
 ## Troubleshooting
 
-**Errors starting with `[MSK proxy]`** include the fix: refresh `.auth.env` for a rejected token, or run `aiportal models sync --apply` for a model the portal no longer offers.
+**Start with `aiportal doctor`.** It checks the installation, your token, the model config, the proxy, the commands on your PATH and opencode / Claude Code, and prints the fix for anything wrong.
 
-**"No connected db" (HTTP 400).** The proxy rejected the session's key: LiteLLM reports a key it doesn't recognize this way. It happens when a session outlives the key it started with, for example after `.proxy/master_key` was deleted and recreated. Quit and resume the session with `aiportal-opencode -c` or `aiportal-claude -c` to pick up the current key. Ordinary proxy restarts don't cause this: the proxy comes back on the same port with the same key.
+**Errors starting with `[MSK proxy]`** include the fix: run `aiportal token set` for a rejected token, or `uv tool upgrade aiportal` for a model the portal no longer offers.
+
+**"No connected db" (HTTP 400).** The proxy rejected the session's key: LiteLLM reports a key it doesn't recognize this way. It happens when a session outlives the key it started with, for example after the key file was deleted and recreated. Quit and resume the session with `aiportal-opencode -c` or `aiportal-claude -c`. Ordinary proxy restarts don't cause this: the proxy comes back on the same port with the same key.
 
 **The proxy won't start.** The launch command prints the end of the log. Run `aiportal proxy start` to see the full output in the foreground.
 
 **Claude Code hangs on the "trust this folder" prompt** the first time you use it in a directory. Run plain `claude` there once to answer the prompt, then use `aiportal-claude`.
 
-**SSL certificate errors.** The proxy disables SSL verification for the portal's internal certificate. If you still see SSL errors, make sure you're running the latest version of the proxy.
-
 ## Security
 
-- `.auth.env` and `.proxy/` are readable only by you; the launchers tighten their permissions if they loosen. Never commit them.
-- The proxy listens on localhost and requires the key in `.proxy/master_key`, so other users can't spend your token through it.
-- SSL verification is disabled only for the connection to the portal.
+- Your token and the proxy key are readable only by you; the launchers tighten their permissions if they loosen.
+- The proxy listens on localhost and requires the key, so other users can't spend your token through it.
+- SSL verification is disabled only for the connection to the portal, which uses an internal certificate.
+
+## Development
+
+```bash
+git clone https://github.com/msk-mind/msk-claude && cd msk-claude
+uv run aiportal-opencode        # run from the source tree
+uv run aiportal doctor
+```
+
+The code is in `src/aiportal/`: `launch.py` (the two launchers), `proxy.py` (starting and finding the proxy), `server.py` (runs LiteLLM), `callbacks.py` (request fixes and error hints), `auth.py`, `models.py`, `doctor.py`, `migrate.py` (`aiportal setup`) and `cli.py`. Dependencies are pinned to tested versions in `pyproject.toml`, because the proxy relies on LiteLLM internals; upgrade them deliberately and re-test with `uv run aiportal models sync --test`.
+
+### Updating the Model List
+
+`src/aiportal/litellm_config.yaml` is the single source of the model list; the launchers, the opencode config and the list above are generated from it. When the portal adds or retires models:
+
+```bash
+uv run aiportal models sync --apply   # update the config and this README
+uv run aiportal models sync --test    # check every model answers
+```
+
+Then bump `version` in `pyproject.toml`, commit and open a PR. Once it's merged, everyone gets the new list with `uv tool upgrade aiportal`.
