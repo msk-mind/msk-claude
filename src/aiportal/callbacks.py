@@ -54,11 +54,11 @@ ERROR_HINTS = [
     (
         lambda status, text: "Model not found" in text,
         "The MSK endpoint no longer offers this model. "
-        "Run 'aiportal models sync --apply' to update the model list.",
+        "Update aiportal (uv tool upgrade aiportal) to get the current model list.",
     ),
     (
         lambda status, text: "'startswith'" in text,
-        "The MSK endpoint rejected the request format; check add_chat_id in proxy/custom_callbacks.py.",
+        "The MSK endpoint rejected the request format; check add_chat_id in aiportal/callbacks.py.",
     ),
 ]
 
