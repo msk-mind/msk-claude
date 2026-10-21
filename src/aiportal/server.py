@@ -10,10 +10,10 @@ import sys
 
 from .auth import load_token
 from .paths import LITELLM_CONFIG, WEBUI_URL, host_state_dir, private_dir
-from .proxy import ensure_proxy_key, fingerprint
+from .proxy import ensure_proxy_key, fingerprint, requested_bind
 
 # Listen on localhost only unless MSK_PROXY_BIND=0.0.0.0 opts in to clients on other machines
-BIND_HOST = os.environ.get("MSK_PROXY_BIND", "127.0.0.1")
+BIND_HOST = requested_bind()
 
 # The portal uses an internal certificate: disable SSL verification for this process
 ssl._create_default_https_context = ssl._create_unverified_context

@@ -13,7 +13,7 @@ import time
 
 from .auth import check_token, cmd_token_set, load_token, parse_pasted_token, token_expiry, write_auth_file
 from .paths import AUTH_PATH, PROXY_KEY_PATH, STATE_DIR, private_dir
-from .proxy import kill_process_group
+from .proxy import kill_process_group, process_args
 
 LEGACY_STATE = (".auth.env", ".proxy", ".litellm_proxy.pid", ".litellm_master_key", ".litellm_server_info")
 
@@ -58,14 +58,18 @@ def _stop_legacy_proxies(clone, running):
         except (OSError, ValueError):
             pass
     for pid in pids:
-        try:
-            os.kill(pid, 0)
-        except (ProcessLookupError, PermissionError):
+        # Only ever stop an old proxy: a recorded pid may since have been reused
+        if not _is_legacy_proxy(pid):
             continue
         kill_process_group(pid)
         if _alive(pid):
             os.kill(pid, 9)
         print(f"  Stopped the old proxy (pid {pid})")
+
+
+def _is_legacy_proxy(pid):
+    args = process_args(pid) or []
+    return any(os.path.basename(a) in ("server.py", "start_litellm.py") for a in args)
 
 
 def _alive(pid):

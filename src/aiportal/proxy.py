@@ -12,6 +12,7 @@ import os
 import secrets
 import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -111,17 +112,33 @@ def probe(host, port, key=None):
     return "ok" if r.status_code == 200 else "rejected" if r.status_code in (400, 401, 403) else "down"
 
 
+def process_args(pid):
+    """A process's command line as a list of strings, or None if it isn't running."""
+    try:
+        return open(f"/proc/{pid}/cmdline", "rb").read().decode(errors="replace").split("\0")
+    except FileNotFoundError:
+        return None
+    except OSError:  # no /proc (e.g. macOS)
+        out = subprocess.run(["ps", "-o", "args=", "-p", str(pid)], capture_output=True, text=True)
+        return out.stdout.split() if out.returncode == 0 and out.stdout.strip() else None
+
+
+def is_aiportal_proxy(pid):
+    """True only if pid is an aiportal proxy, so a stale pid file (e.g. after a reboot,
+    once the pid has been reused) never leads to killing an unrelated process."""
+    return "aiportal.server" in (process_args(pid) or [])
+
+
 def owned_pid(state_dir=None):
-    """The pid of this machine's background proxy, if one is recorded and alive."""
+    """The pid of this machine's background proxy, if one is recorded and still running."""
     try:
         host, pid = open(os.path.join(state_dir or host_state_dir(), "proxy.pid")).read().split()
         pid = int(pid)
-        if host != socket.gethostname():
-            return None
-        os.kill(pid, 0)
-        return pid
-    except (FileNotFoundError, ValueError, ProcessLookupError, PermissionError):
+    except (FileNotFoundError, ValueError):
         return None
+    if host != socket.gethostname() or not is_aiportal_proxy(pid):
+        return None
+    return pid
 
 
 def kill_process_group(pid):
@@ -251,6 +268,11 @@ def _find_shared_proxy(key):
     return None
 
 
+def requested_bind():
+    """The address a new proxy listens on: localhost unless MSK_PROXY_BIND opts in to other machines."""
+    return os.environ.get("MSK_PROXY_BIND", "127.0.0.1")
+
+
 def ensure_proxy():
     """Make sure a proxy is reachable, starting or restarting one if needed.
 
@@ -263,28 +285,32 @@ def ensure_proxy():
     state_dir = private_dir(host_state_dir())
     with _locked(state_dir):
         info = read_server_info(os.path.join(state_dir, "server_info"))
-        if not info:
-            shared = _find_shared_proxy(key)
-            if shared:
-                return (*shared, key)
-            return (*_start_background(state_dir), key)
+        host, port = (connect_address(info), info.get("port")) if info else (None, None)
+        status = probe(host, port, key) if info else "down"
 
-        host, port = connect_address(info), info.get("port")
-        status = probe(host, port, key)
         if status == "ok":
-            if info.get("fingerprint") == fingerprint():
+            reason = None
+            if info.get("fingerprint") != fingerprint():
+                reason = "your token, key or aiportal version changed since the proxy started"
+            elif "MSK_PROXY_BIND" in os.environ and info.get("bind") != requested_bind():
+                reason = f"the proxy listens on {info.get('bind')}, but MSK_PROXY_BIND={requested_bind()}"
+            if not reason:
                 print(f"Proxy is running at http://{host}:{port}")
                 return host, port, key
             if not owned_pid(state_dir):
-                print(f"Warning: your token, key or aiportal version changed after the proxy at "
-                      f"http://{host}:{port} started, but it was not started by aiportal, so it was "
-                      "left running. Restart it yourself to pick up the change.")
+                print(f"Warning: {reason}, but the proxy at http://{host}:{port} was not started by "
+                      "aiportal, so it was left running. Restart it yourself to pick up the change.")
                 return host, port, key
-            print("Your token, key or aiportal version changed since the proxy started; restarting it...")
+            print(f"{reason[0].upper()}{reason[1:]}; restarting it...")
         elif status == "rejected":
             print(f"The proxy at http://{host}:{port} rejected this key; replacing it...")
         else:
-            print(f"Proxy not reachable at http://{host}:{port}")
+            # No working proxy here: use a shared one from another machine if there is one
+            shared = _find_shared_proxy(key)
+            if shared:
+                return (*shared, key)
+            if info:
+                print(f"Proxy not reachable at http://{host}:{port}")
         return (*_start_background(state_dir, previous_port=port), key)
 
 
