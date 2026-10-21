@@ -44,4 +44,7 @@ echo "Press Ctrl+C to stop"
 echo ""
 
 cd "$SCRIPT_DIR"
-exec python3 server.py
+# Use the repo's private environment when it exists (created by install.sh)
+PYTHON="$REPO_DIR/.venv/bin/python"
+[ -x "$PYTHON" ] || PYTHON=python3
+exec "$PYTHON" server.py

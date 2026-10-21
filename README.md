@@ -12,27 +12,19 @@ aiportal-claude                       # Claude Code
 
 ## Quick Start
 
-1. **Install dependencies**
+1. **Get your session token.** Log in to https://chat.aicopilot.aws.mskcc.org, open Developer Tools (F12; Cmd+Option+I on a Mac), go to the site's cookies (Chrome/Edge: Application tab; Firefox/Safari: Storage tab) and copy the value of the `token` cookie.
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Save your session token.** Log in to https://chat.aicopilot.aws.mskcc.org, open Developer Tools (F12; Cmd+Option+I on a Mac), go to the site's cookies (Chrome/Edge: Application tab; Firefox/Safari: Storage tab) and copy the value of the `token` cookie. Put it in `.auth.env` in this directory:
-
-   ```bash
-   export WEBUI_SESSION_TOKEN='your-token-here'
-   ```
-
-   Tokens last 14 days. `aiportal token` shows when yours expires; the launch commands warn you 2 days ahead and stop with these steps once it has expired.
-
-3. **Install the commands**
+2. **Run the installer** from your clone of this repository, and paste the token when it asks:
 
    ```bash
    ./install.sh
    ```
 
-   This links `aiportal-opencode`, `aiportal-claude` and `aiportal` into `~/.local/bin`.
+   The installer checks prerequisites, creates a private Python environment (`.venv`) with the tested dependency versions, links `aiportal-opencode`, `aiportal-claude` and `aiportal` into `~/.local/bin`, saves your token (readable only by you, after checking it with the portal), and finishes with `aiportal doctor`. You need Python 3.10+ (or [uv](https://docs.astral.sh/uv/)), and opencode or Claude Code.
+
+Tokens last 14 days. When yours runs out, the launch commands stop and ask you to run `aiportal token set` with a fresh one; they also warn you 2 days ahead.
+
+To update, `git pull` and run `./install.sh` again; it only reinstalls dependencies when `requirements.txt` changed.
 
 ## Usage
 
@@ -81,7 +73,9 @@ You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-cl
 | `aiportal models sync` | Show models the portal has added or retired |
 | `aiportal models sync --apply` | Update the config and the list below to match the portal |
 | `aiportal models sync --test` | Send a one-line prompt to every configured model |
-| `aiportal token` | Check your session token |
+| `aiportal token` | Show when your session token expires |
+| `aiportal token set` | Save a new session token (checked with the portal first) |
+| `aiportal doctor` | Check the whole setup and say what to fix |
 
 ### Available Models
 
@@ -143,12 +137,14 @@ proxy/
   custom_callbacks.py   request fixes and error hints
   server.py             starts LiteLLM with the right port, key and state directory
   run.sh                loads .auth.env and runs server.py
-install.sh              link the commands into ~/.local/bin
+install.sh              set everything up (safe to re-run)
+requirements.txt        pinned dependency versions, installed into .venv
 ```
 
 Created at runtime and not in git:
 
 ```
+.venv/                  private Python environment
 .auth.env               your session token
 .proxy/
   master_key            secret the launchers use to authenticate to the proxy
@@ -166,7 +162,9 @@ By default the proxy only accepts connections from its own machine. To use one p
 
 ## Troubleshooting
 
-**Errors starting with `[MSK proxy]`** include the fix: refresh `.auth.env` for a rejected token, or run `aiportal models sync --apply` for a model the portal no longer offers.
+**Start with `aiportal doctor`.** It checks the Python environment, your token, the model config, the proxy, the commands on your PATH and opencode / Claude Code, and prints the fix for anything wrong.
+
+**Errors starting with `[MSK proxy]`** include the fix: run `aiportal token set` for a rejected token, or `aiportal models sync --apply` for a model the portal no longer offers.
 
 **"No connected db" (HTTP 400).** The proxy rejected the session's key: LiteLLM reports a key it doesn't recognize this way. It happens when a session outlives the key it started with, for example after `.proxy/master_key` was deleted and recreated. Quit and resume the session with `aiportal-opencode -c` or `aiportal-claude -c` to pick up the current key. Ordinary proxy restarts don't cause this: the proxy comes back on the same port with the same key.
 

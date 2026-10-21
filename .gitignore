@@ -9,3 +9,6 @@ __pycache__/
 # Files from earlier versions (moved into .proxy/ on the next launch)
 .litellm_master_key
 .opencode_msk.json
+
+# Private Python environment (created by install.sh)
+.venv/

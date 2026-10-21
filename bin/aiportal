@@ -3,7 +3,14 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "lib"))
+REPO_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+# Run inside the repo's private environment when it exists (created by install.sh)
+VENV_PYTHON = os.path.join(REPO_DIR, ".venv", "bin", "python")
+if os.path.exists(VENV_PYTHON) and os.path.realpath(sys.prefix) != os.path.realpath(os.path.join(REPO_DIR, ".venv")):
+    os.execv(VENV_PYTHON, [VENV_PYTHON, os.path.realpath(__file__), *sys.argv[1:]])
+
+sys.path.insert(0, os.path.join(REPO_DIR, "lib"))
 
 import aiportal  # noqa: E402
 

@@ -13,6 +13,9 @@ Usage:
                                 refreshes token limits and the README model list.
                                 --test sends a one-line prompt to every configured model.
   aiportal token                Check the session token in .auth.env
+  aiportal token set            Save a new session token (pasted with hidden input) after
+                                checking it with the portal
+  aiportal doctor               Check the whole setup and say what to fix
 
 proxy/litellm_config.yaml is the single source of truth for the model list; the
 launch commands, the opencode config and the README list are generated from it.
@@ -21,7 +24,10 @@ import base64
 import json
 import os
 import re
+import getpass
 import secrets
+import shutil
+import subprocess
 import signal
 import socket
 import stat
@@ -61,8 +67,7 @@ TOKEN_HELP = f"""To get a new token:
   3. Go to the cookies for that site:
        Chrome/Edge: Application tab -> Cookies;  Firefox/Safari: Storage tab -> Cookies
   4. Copy the value of the 'token' cookie
-  5. Put it in {AUTH_PATH}:
-       export WEBUI_SESSION_TOKEN='<token>'"""
+  5. Run: aiportal token set"""
 
 
 # --- config -----------------------------------------------------------------
@@ -406,6 +411,171 @@ def write_readme(config):
         f.write(text)
 
 
+# --- token set ----------------------------------------------------------------
+
+def verify_token(token):
+    """True if the portal accepts the token, False if it rejects it, None if it can't be reached."""
+    import requests
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    try:
+        r = requests.get(f"{API_BASE}/auths/", headers={"Authorization": f"Bearer {token}"},
+                         verify=False, timeout=20)
+    except requests.RequestException:
+        return None
+    if r.status_code in (401, 403):
+        return False
+    return r.ok or None
+
+
+def write_auth_file(token):
+    """Replace .auth.env in one step, readable only by its owner."""
+    fd, tmp = tempfile.mkstemp(prefix=".auth.env.", dir=REPO_DIR)  # created 0600
+    with os.fdopen(fd, "w") as f:
+        f.write(f"export WEBUI_SESSION_TOKEN='{token}'\n")
+    os.replace(tmp, AUTH_PATH)
+
+
+def cmd_token_set():
+    if sys.stdin.isatty():
+        print(f"Paste your session token from {WEBUI_URL} (the 'token' cookie).")
+        raw = getpass.getpass("Token (input hidden): ")
+    else:
+        raw = sys.stdin.read()
+    # Accept a bare token or a pasted line like: export WEBUI_SESSION_TOKEN='...'
+    token = re.sub(r"^\s*(export\s+)?(WEBUI_SESSION_TOKEN=)?", "", raw.strip()).strip("'\" ")
+    if not token:
+        print("No token entered; nothing changed.")
+        return 1
+    exp = token_expiry(token)
+    if exp is not None and exp <= time.time():
+        print("Error: that token has already expired; log in again and copy a fresh one.")
+        return 1
+    ok = verify_token(token)
+    if ok is False:
+        print("Error: the portal rejected that token; nothing changed. Make sure you copied the whole 'token' cookie.")
+        return 1
+    write_auth_file(token)
+    print(f"Saved the token to {AUTH_PATH} (readable only by you).")
+    if ok is None:
+        print(f"Warning: couldn't reach {WEBUI_URL} to check it.")
+    if exp is not None:
+        print(f"It is valid until {time.strftime('%Y-%m-%d %H:%M', time.localtime(exp))}.")
+    print("The proxy picks it up on your next aiportal-opencode / aiportal-claude launch.")
+    return 0
+
+
+# --- doctor -------------------------------------------------------------------
+
+def _pinned_requirements():
+    pins = {}
+    for line in open(os.path.join(REPO_DIR, "requirements.txt")):
+        m = re.match(r"^\s*([A-Za-z0-9_.-]+)(\[[^\]]*\])?==([^\s#]+)", line)
+        if m:
+            pins[m.group(1)] = m.group(3)
+    return pins
+
+
+def _version_of(cmd):
+    try:
+        out = subprocess.run([cmd, "--version"], capture_output=True, text=True, timeout=20,
+                             stdin=subprocess.DEVNULL).stdout.strip().splitlines()
+        return out[0] if out else "?"
+    except (OSError, subprocess.TimeoutExpired):
+        return "?"
+
+
+def cmd_doctor():
+    problems = 0
+
+    def report(ok, label, detail, fix=None):
+        nonlocal problems
+        mark = {True: "ok  ", False: "FAIL", None: "warn"}[ok]
+        print(f"  [{mark}] {label}: {detail}")
+        if fix and ok is not True:
+            print(f"         -> {fix}")
+        problems += ok is False
+
+    print("Python environment")
+    venv = os.path.join(REPO_DIR, ".venv")
+    in_venv = os.path.realpath(sys.prefix) == os.path.realpath(venv)
+    report(in_venv or None, "private environment",
+           f"using {sys.prefix}" if not in_venv else f"{venv} (Python {sys.version.split()[0]})",
+           "run ./install.sh to create .venv")
+    import importlib.metadata as md
+    for name, pinned in _pinned_requirements().items():
+        try:
+            have = md.version(name)
+        except md.PackageNotFoundError:
+            report(False, name, "not installed", "run ./install.sh")
+            continue
+        report(True if have == pinned else None, name,
+               have if have == pinned else f"{have} (tested with {pinned})", "run ./install.sh")
+
+    print("Session token")
+    token = load_token()
+    if not token:
+        report(False, ".auth.env", "no token", "run: aiportal token set")
+    else:
+        exp = token_expiry(token)
+        if exp is not None:
+            days = (exp - time.time()) / 86400
+            when = time.strftime("%Y-%m-%d %H:%M", time.localtime(exp))
+            report(False if days <= 0 else None if days < TOKEN_WARN_DAYS else True, "expiry",
+                   f"expired {when}" if days <= 0 else f"valid until {when} ({days:.1f} days)",
+                   "run: aiportal token set")
+        accepted = verify_token(token)
+        report(accepted, "portal accepts it",
+               {True: "yes", False: "rejected", None: f"couldn't reach {WEBUI_URL}"}[accepted],
+               "run: aiportal token set" if accepted is False else "check your network / VPN")
+        mode = stat.S_IMODE(os.stat(AUTH_PATH).st_mode) if os.path.exists(AUTH_PATH) else None
+        if mode is not None:
+            report(not mode & 0o077 or None, "permissions", oct(mode),
+                   "the next launch restricts it automatically")
+
+    print("Models")
+    try:
+        names = [m["model_name"] for m in visible_models(load_config())]
+        report(True, "config", f"{len(names)} models in {os.path.relpath(CONFIG_PATH, REPO_DIR)}")
+    except Exception as e:  # noqa: BLE001 - report any config problem
+        report(False, "config", f"can't read {CONFIG_PATH}: {e}")
+
+    print("Proxy")
+    info = read_server_info(os.path.join(host_state_dir(), "server_info"))
+    if not info:
+        report(True, socket.gethostname(), "not running (starts on the next launch)")
+    else:
+        addr = "127.0.0.1" if info.get("bind") == "127.0.0.1" else info.get("hostname")
+        state = probe(addr, info.get("port"))
+        report({"ok": True, "down": True, "rejected": False}[state], socket.gethostname(),
+               {"ok": f"running at http://{addr}:{info.get('port')}",
+                "down": "not running (starts on the next launch)",
+                "rejected": f"a proxy at http://{addr}:{info.get('port')} rejects the key"}[state],
+               "run: aiportal proxy stop, then relaunch")
+
+    print("Commands")
+    for name in ("aiportal-opencode", "aiportal-claude", "aiportal"):
+        found = shutil.which(name)
+        expected = os.path.join(REPO_DIR, "bin", name)
+        if not found:
+            report(False, name, "not on your PATH", "run ./install.sh (and add ~/.local/bin to PATH)")
+        elif os.path.realpath(found) != os.path.realpath(expected):
+            report(None, name, f"{found} points somewhere else", "run ./install.sh")
+        else:
+            report(True, name, found)
+    clients = [c for c in ("opencode", "claude") if shutil.which(c)]
+    for c in ("opencode", "claude"):
+        if shutil.which(c):
+            report(True, c, _version_of(c))
+        else:
+            report(None if clients else False, c, "not installed",
+                   "install it to use " + ("aiportal-opencode" if c == "opencode" else "aiportal-claude"))
+
+    print()
+    print("Everything looks good." if not problems else f"{problems} problem(s) found; see the -> lines above.")
+    return 1 if problems else 0
+
+
 # --- proxy --------------------------------------------------------------------
 
 def read_server_info(path):
@@ -538,7 +708,11 @@ def main(argv):
         return 0
     if cmd == "models" and sub == "sync":
         return cmd_sync(apply="--apply" in args, test="--test" in args)
-    if cmd == "token":
+    if cmd == "token" and sub == "set":
+        return cmd_token_set()
+    if cmd == "doctor":
+        return cmd_doctor()
+    if cmd == "token" and sub is None:
         rc = cmd_token_check()
         if rc == 0:
             exp = token_expiry(load_token() or "")
