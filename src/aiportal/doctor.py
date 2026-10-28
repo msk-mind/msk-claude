@@ -110,7 +110,8 @@ def cmd_doctor():
                "run: aiportal setup  (stops it and moves your token over)")
 
     print("Commands")
-    for name in ("aiportal-opencode", "aiportal-claude", "aiportal"):
+    for name in ("aiportal-opencode", "aiportal-claude", "aiportal-omp", "aiportal",
+                 "databricks-opencode", "databricks-claude", "databricks-omp"):
         found = shutil.which(name)
         expected = os.path.join(sys.prefix, "bin", name)
         if not found:
@@ -120,13 +121,12 @@ def cmd_doctor():
                    "reinstall: uv tool install --force git+https://github.com/msk-mind/msk-claude")
         else:
             report(True, name, found)
-    clients = [c for c in ("opencode", "claude") if shutil.which(c)]
-    for c in ("opencode", "claude"):
+    clients = [c for c in ("opencode", "claude", "omp") if shutil.which(c)]
+    for c in ("opencode", "claude", "omp"):
         if shutil.which(c):
             report(True, c, _version_of(c))
         else:
-            report(None if clients else False, c, "not installed",
-                   "install it to use " + ("aiportal-opencode" if c == "opencode" else "aiportal-claude"))
+            report(None if clients else False, c, "not installed", f"install it to use aiportal-{c} and databricks-{c}")
 
     print()
     print("Everything looks good." if not problems else f"{problems} problem(s) found; see the -> lines above.")

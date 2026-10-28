@@ -1,7 +1,7 @@
 [project]
 name = "aiportal"
-version = "1.0.1"
-description = "Use opencode and Claude Code with the models on MSK's AI Portal, through a local LiteLLM proxy"
+version = "1.1.0"
+description = "Use opencode, Claude Code and omp with the models on MSK's AI Portal or a Databricks workspace"
 readme = "README.md"
 requires-python = ">=3.10"
 # Pinned to the tested versions: the proxy relies on LiteLLM internals, so
@@ -17,6 +17,10 @@ dependencies = [
 aiportal = "aiportal.cli:main"
 aiportal-opencode = "aiportal.launch:opencode_main"
 aiportal-claude = "aiportal.launch:claude_main"
+aiportal-omp = "aiportal.launch:omp_main"
+databricks-opencode = "aiportal.databricks:opencode_main"
+databricks-claude = "aiportal.databricks:claude_main"
+databricks-omp = "aiportal.databricks:omp_main"
 
 [project.urls]
 Repository = "https://github.com/msk-mind/msk-claude"
