@@ -1,25 +1,32 @@
-# MSK AI Portal for opencode and Claude Code
+# MSK AI Portal and Databricks for opencode, Claude Code and omp
 
-⚠️ **This approach is very expensive so we don't recommend it (think $500 for two days of coding)**
+⚠️ **All of this is API billing: you pay for every token. Be mindful of your token usage and costs.**
 
-Use [opencode](https://opencode.ai) or Claude Code with the models on MSK's AI Portal (Open WebUI at `https://chat.aicopilot.aws.mskcc.org`), through a LiteLLM proxy that runs on your machine.
+Use [opencode](https://opencode.ai), Claude Code or [omp](https://github.com/can1357/oh-my-pi) with the models on:
+
+- **MSK's AI Portal** (Open WebUI at `https://chat.aicopilot.aws.mskcc.org`), through a LiteLLM proxy that runs on your machine
+- **a Databricks workspace's Foundation Model APIs**, directly, with the profile you already use for the `databricks` CLI (see [Databricks](#databricks))
 
 ```bash
-aiportal-opencode                     # opencode with Claude Sonnet 5.5
+aiportal-opencode                     # opencode with Claude Sonnet 5.5 on the AI Portal
 aiportal-opencode -m gpt-5.6-terra    # or any other model on the portal
-aiportal-claude                       # Claude Code
+aiportal-claude                       # Claude Code on the AI Portal
+aiportal-omp                          # omp on the AI Portal
+databricks-opencode                   # opencode with Claude Sonnet 5.5 on Databricks
+databricks-claude                     # Claude Code on Databricks
+databricks-omp                        # omp on Databricks
 ```
 
 ## Install
 
-You need [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and opencode or Claude Code.
+You need [uv](https://docs.astral.sh/uv/) (`curl -LsSf https://astral.sh/uv/install.sh | sh`) and opencode, Claude Code or omp.
 
 ```bash
 uv tool install git+https://github.com/msk-mind/msk-claude
 aiportal setup
 ```
 
-`aiportal setup` asks for your session token and checks the whole setup. To get the token: log in to https://chat.aicopilot.aws.mskcc.org, open Developer Tools (F12; Cmd+Option+I on a Mac), go to the site's cookies (Chrome/Edge: Application tab; Firefox/Safari: Storage tab) and copy the value of the `token` cookie.
+For the AI Portal, `aiportal setup` asks for your session token and checks the whole setup. To get the token: log in to https://chat.aicopilot.aws.mskcc.org, open Developer Tools (F12; Cmd+Option+I on a Mac), go to the site's cookies (Chrome/Edge: Application tab; Firefox/Safari: Storage tab) and copy the value of the `token` cookie.
 
 Tokens last 14 days. When yours runs out, the launch commands stop and ask you to run `aiportal token set` with a fresh one; they also warn you 2 days ahead.
 
@@ -56,22 +63,31 @@ aiportal-claude -m claude-opus-5.5 ~/project
 eval "$(aiportal env)" && claude      # or set up the environment and run claude yourself
 ```
 
+### omp
+
+```bash
+aiportal-omp
+aiportal-omp -m gpt-5.6-terra ~/project
+```
+
+omp only reads custom providers from `~/.omp/agent/models.yml`, so `aiportal-omp` adds an `msk` provider there (or updates it), and leaves the rest of the file as is. The proxy key isn't written to the file: omp reads it from the `MSK_PROXY_KEY` environment variable. The provider points at the proxy of the machine you last launched `aiportal-omp` on, so if machines share your home directory, start omp with `aiportal-omp` rather than plain `omp`.
+
 ### Resuming Sessions
 
-Both launchers can pick up an earlier session in the same directory:
+All three launchers can pick up an earlier session in the same directory:
 
-| | opencode | Claude Code |
-|---|---|---|
-| Continue the most recent session | `aiportal-opencode -c` | `aiportal-claude -c` |
-| Resume a specific session | `aiportal-opencode -r <session-id>` | `aiportal-claude -r <session-id>` |
-| Choose from a list | `/sessions` inside opencode | `aiportal-claude -r` |
-| Continue in a copy, leaving the original as is | add `--fork` | add `--fork` |
+| | opencode | Claude Code | omp |
+|---|---|---|---|
+| Continue the most recent session | `aiportal-opencode -c` | `aiportal-claude -c` | `aiportal-omp -c` |
+| Resume a specific session | `aiportal-opencode -r <session-id>` | `aiportal-claude -r <session-id>` | `aiportal-omp -r <session-id>` |
+| Choose from a list | `/sessions` inside opencode | `aiportal-claude -r` | `aiportal-omp -r` |
+| Continue in a copy, leaving the original as is | add `--fork` | add `--fork` | not available |
 
 With `aiportal-claude`, `-m` sets the model for the resumed conversation. Options and the directory can come in any order, e.g. `aiportal-opencode ~/project -c`.
 
 ### Managing the Proxy and Models
 
-You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-claude` check your token, reuse this machine's proxy if it's running, and otherwise start one in the background. A proxy keeps running after you exit, and is restarted automatically (on the same port, so open sessions keep working) when your token, its key or aiportal itself changes. Use `aiportal` for everything else:
+You don't need to start the proxy yourself. `aiportal-opencode`, `aiportal-claude` and `aiportal-omp` check your token, reuse this machine's proxy if it's running, and otherwise start one in the background. A proxy keeps running after you exit, and is restarted automatically (on the same port, so open sessions keep working) when your token, its key or aiportal itself changes. Use `aiportal` for everything else:
 
 | Command | What it does |
 |---|---|
@@ -121,13 +137,45 @@ You don't need to start the proxy yourself. `aiportal-opencode` and `aiportal-cl
 
 The default is `claude-sonnet-5.5`. Haiku isn't available on the portal; Claude Code's Haiku requests go to Claude Sonnet 5.5.
 
+## Databricks
+
+`databricks-opencode`, `databricks-claude` and `databricks-omp` use the Foundation Model API endpoints of a Databricks workspace. They need no proxy and no `aiportal setup`: the workspace and token come from a profile in `~/.databrickscfg`, the one the `databricks` CLI uses (set one up with `databricks auth login`). Usage goes to the workspace's bill.
+
+```bash
+databricks-opencode                        # Claude Sonnet 5.5, profile DEFAULT
+databricks-opencode -m gpt-6-sol ~/project # a model and a directory
+databricks-claude -m claude-opus-5-5       # Claude Code (Claude models only)
+databricks-omp -p dev                      # another profile, i.e. another workspace
+databricks-opencode -c                     # continue the most recent session
+```
+
+The profile is `DEFAULT` unless you set `DATABRICKS_CONFIG_PROFILE` or pass `-p`. `-c`, `-r` and `--fork` work as for the AI Portal launchers ([Resuming Sessions](#resuming-sessions)); omp has no `--fork`.
+
+| Model | Endpoint | Context / max output |
+|---|---|---|
+| `claude-sonnet-5-5` (default) | `databricks-claude-sonnet-5-5` | 1,000,000 / 128,000 |
+| `claude-opus-5-5` | `databricks-claude-opus-5-5` | 1,000,000 / 128,000 |
+| `claude-haiku-5-5` | `databricks-claude-haiku-5-5` | 1,000,000 / 128,000 |
+| `gpt-6-sol` | `databricks-gpt-6-sol` | 922,000 / 128,000 |
+| `gpt-5-6-terra` | `databricks-gpt-5-6-terra` | 922,000 / 128,000 |
+
+The workspace offers more models (`databricks serving-endpoints list`), but these are the ones checked with tool calls in all three clients. Gemini and GLM endpoints don't work with opencode's tool calls.
+
+How each client is set up:
+
+- **opencode**: Claude goes through Databricks' Anthropic-format endpoint (`/serving-endpoints/anthropic`) and GPT through its OpenAI Responses endpoint (`/serving-endpoints/responses`). As with `aiportal-opencode`, the providers are passed in a separate config through `OPENCODE_CONFIG`, so your global opencode config isn't changed.
+- **Claude Code**: `ANTHROPIC_BASE_URL` points at the Anthropic-format endpoint, and the `opus`, `sonnet` and `haiku` aliases map to the Databricks Claude models.
+- **omp**: as with `aiportal-omp`, `databricks-omp` adds (or updates) two providers in `~/.omp/agent/models.yml`, `databricks-claude` and `databricks-openai`, and leaves the rest of the file as is. They replace the Claude Code beta flags omp sends, which Databricks rejects, and set the Claude models to adaptive thinking. After the first launch you can also pick these models in plain `omp`, as long as `DATABRICKS_FMAPI_TOKEN` is set.
+
+The token is passed in the `DATABRICKS_FMAPI_TOKEN` environment variable, so it isn't written to any config file. A profile with a personal access token works for sessions of any length. With an OAuth profile, the launchers get a token from `databricks auth token`, which lasts about an hour; after that, quit and continue the session with `-c`.
+
 ## How It Works
 
 ```
-opencode / Claude Code ──> LiteLLM proxy (localhost) ──> MSK AI Portal (Open WebUI) ──> models
+opencode / Claude Code / omp ──> LiteLLM proxy (localhost) ──> MSK AI Portal (Open WebUI) ──> models
 ```
 
-The proxy accepts OpenAI-format requests (opencode) and Anthropic-format requests (Claude Code) and forwards them to the portal with your session token. Along the way it (`aiportal/callbacks.py`):
+The proxy accepts OpenAI-format requests (opencode, omp) and Anthropic-format requests (Claude Code) and forwards them to the portal with your session token. Along the way it (`aiportal/callbacks.py`):
 
 - removes parameters the portal doesn't support, and adds the `chat_id` field the portal requires
 - puts a plain-language explanation in front of common errors, such as an expired token or a retired model
@@ -142,7 +190,8 @@ The proxy accepts OpenAI-format requests (opencode) and Anthropic-format request
   <hostname>/           one directory per machine
     server_info         where the proxy listens, and what it was started with
     proxy.pid, proxy.log, proxy.lock
-    opencode.json       opencode config generated at launch
+    opencode.json       opencode config generated at launch (databricks-opencode.json for Databricks)
+~/.omp/agent/models.yml omp's own config, where the omp launchers add their providers
 ```
 
 Both are readable only by you, and follow `XDG_CONFIG_HOME` / `XDG_STATE_HOME` (or `AIPORTAL_CONFIG_DIR` / `AIPORTAL_STATE_DIR`). Proxy state is kept per machine, so machines that share your home directory (on a cluster, for example) don't interfere with each other.
@@ -177,7 +226,7 @@ uv run aiportal-opencode        # run from the source tree
 uv run aiportal doctor
 ```
 
-The code is in `src/aiportal/`: `launch.py` (the two launchers), `proxy.py` (starting and finding the proxy), `server.py` (runs LiteLLM), `callbacks.py` (request fixes and error hints), `auth.py`, `models.py`, `doctor.py`, `migrate.py` (`aiportal setup`) and `cli.py`. Dependencies are pinned to tested versions in `pyproject.toml`, because the proxy relies on LiteLLM internals; upgrade them deliberately and re-test with `uv run aiportal models sync --test`.
+The code is in `src/aiportal/`: `launch.py` (the three AI Portal launchers), `omp.py` (omp's models.yml), `databricks.py` (the three Databricks launchers), `proxy.py` (starting and finding the proxy), `server.py` (runs LiteLLM), `callbacks.py` (request fixes and error hints), `auth.py`, `models.py`, `doctor.py`, `migrate.py` (`aiportal setup`) and `cli.py`. Dependencies are pinned to tested versions in `pyproject.toml`, because the proxy relies on LiteLLM internals; upgrade them deliberately and re-test with `uv run aiportal models sync --test`.
 
 ### Updating the Model List
 
