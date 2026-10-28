@@ -7,6 +7,7 @@ which omp reads.
 """
 import json
 import os
+import tempfile
 
 
 def models_path():
@@ -28,13 +29,23 @@ def update_providers(wanted):
     if os.path.exists(path):
         with open(path) as f:
             config = yaml.load(f) or {}
-    providers = config.setdefault("providers", {})
+    # A "providers:" key with nothing under it loads as None
+    providers = config.get("providers") or {}
+    config["providers"] = providers
     if all(json.dumps(providers.get(k), sort_keys=True) == json.dumps(v, sort_keys=True) for k, v in wanted.items()):
         return path
     providers.update(wanted)
-    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        yaml.dump(config, f)
+    # Write a new file and swap it in, so a launch on another machine sharing this
+    # home directory never reads it half-written (and drops the providers it lacks)
+    target = os.path.realpath(path)  # keep a symlinked models.yml a symlink
+    os.makedirs(os.path.dirname(target), mode=0o700, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(target), prefix=".models.yml.")
+    try:
+        with os.fdopen(fd, "w") as f:
+            yaml.dump(config, f)
+        os.replace(tmp, target)
+    except BaseException:
+        os.unlink(tmp)
+        raise
     print(f"Updated the {', '.join(wanted)} provider(s) in {path}")
     return path
