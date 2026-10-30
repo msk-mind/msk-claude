@@ -3,7 +3,8 @@ name = "aiportal"
 version = "1.1.0"
 description = "Use opencode, Claude Code and omp with the models on MSK's AI Portal or a Databricks workspace"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
+# <3.14: litellm 1.81.3 pins uvloop<0.22, which fails to import on Python 3.14
 # Pinned to the tested versions: the proxy relies on LiteLLM internals, so
 # upgrade deliberately and re-test (aiportal models sync --test)
 dependencies = [
